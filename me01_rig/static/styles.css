@@ -1208,6 +1208,53 @@ body {
   color: var(--accent-cyan);
 }
 
+/* --------------------------------------------------------------------------
+   Dynamic Curved Patch Cables Engine
+   -------------------------------------------------------------------------- */
+
+.patch-cables-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+
+.patch-cable-group {
+  transition: opacity 160ms ease;
+}
+
+.patch-cable-outer {
+  fill: none;
+  stroke: #121519;
+  stroke-width: 7px;
+  stroke-linecap: round;
+  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.75));
+}
+
+.patch-cable-inner {
+  fill: none;
+  stroke: #384252;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.patch-cable-jack {
+  fill: #94a3b8;
+  stroke: #1e293b;
+  stroke-width: 1px;
+}
+
+.patch-cable-dimmed,
+.patch-cable-group.patch-cable-dimmed {
+  opacity: 0.28;
+  filter: grayscale(0.85);
+}
+
 /* AMP head SVG colors */
 .svg-amp-cabinet {
   fill: #2d2219;

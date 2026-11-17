@@ -273,6 +273,28 @@ class UIAssetsTests(unittest.TestCase):
         self.assertIn("clampInt", js_text)
         self.assertIn("queueKnobChange", js_text)
 
+    def test_dynamic_patch_cable_routing(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #patch-cables-svg overlay in index.html
+        self.assertIn('id="patch-cables-svg"', html_text)
+
+        # 2. CSS classes in styles.css
+        for cls in (
+            "patch-cables-layer",
+            "patch-cable-outer",
+            "patch-cable-inner",
+            "patch-cable-dimmed",
+        ):
+            self.assertIn(cls, css_text, f"Missing patch cable CSS class: {cls}")
+
+        # 3. renderPatchCables with Bezier paths in app.js
+        self.assertIn("renderPatchCables", js_text)
+        self.assertIn("patch-cable-dimmed", js_text)
+        self.assertIn("ResizeObserver", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()

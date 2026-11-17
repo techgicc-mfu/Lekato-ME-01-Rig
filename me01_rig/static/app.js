@@ -140,6 +140,8 @@
       "pedalboard-stage",
       "pedalboard-empty",
       "pedalboard-chain",
+      "patch-cables-svg",
+      "knob-floating-tooltip",
       "pedal-cards-row",
       "btn-move-earlier",
       "btn-move-later",
@@ -1837,6 +1839,69 @@
         focusTarget.focus({ preventScroll: true });
       }
     }
+
+    window.requestAnimationFrame(() => {
+      renderPatchCables();
+    });
+  }
+
+  function renderPatchCables() {
+    const svg = els["patch-cables-svg"];
+    if (!svg) return;
+    svg.replaceChildren();
+
+    const ram = app.state?.ram;
+    if (!ram || !Array.isArray(ram.order) || els["pedalboard-chain"].hidden) return;
+
+    const row = els["pedal-cards-row"];
+    const cards = Array.from(row.querySelectorAll(".pedal-card"));
+    if (cards.length === 0) return;
+
+    const svgRect = svg.getBoundingClientRect();
+    if (svgRect.width === 0 || svgRect.height === 0) return;
+
+    const ns = svg.namespaceURI;
+
+    function getRelPoint(clientX, clientY) {
+      return {
+        x: clientX - svgRect.left,
+        y: clientY - svgRect.top,
+      };
+    }
+
+    for (let i = 0; i < cards.length - 1; i += 1) {
+      const cardA = cards[i];
+      const cardB = cards[i + 1];
+      const rectA = cardA.getBoundingClientRect();
+      const rectB = cardB.getBoundingClientRect();
+
+      const blockAId = Number(cardA.getAttribute("data-block-id"));
+      const blockBId = Number(cardB.getAttribute("data-block-id"));
+      const blockA = getBlockById(ram, blockAId);
+      const blockB = getBlockById(ram, blockBId);
+      const isDimmed = !(blockA?.enabled && blockB?.enabled);
+
+      const p1 = getRelPoint(rectA.right - 2, rectA.top + rectA.height * 0.54);
+      const p2 = getRelPoint(rectB.left + 2, rectB.top + rectB.height * 0.54);
+
+      const dx = p2.x - p1.x;
+      const slack = Math.min(36, Math.max(14, dx * 0.35));
+      const d = `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} C ${(p1.x + dx * 0.45).toFixed(1)} ${(p1.y + slack).toFixed(1)}, ${(p2.x - dx * 0.45).toFixed(1)} ${(p2.y + slack).toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+
+      const group = document.createElementNS(ns, "g");
+      group.setAttribute("class", `patch-cable-group${isDimmed ? " patch-cable-dimmed" : ""}`);
+
+      const outerPath = document.createElementNS(ns, "path");
+      outerPath.setAttribute("class", "patch-cable-outer");
+      outerPath.setAttribute("d", d);
+
+      const innerPath = document.createElementNS(ns, "path");
+      innerPath.setAttribute("class", "patch-cable-inner");
+      innerPath.setAttribute("d", d);
+
+      group.append(outerPath, innerPath);
+      svg.appendChild(group);
+    }
   }
 
   function renderInspectorSubtitle() {
@@ -2167,6 +2232,15 @@
     };
     window.addEventListener("pointerup", clearDragState);
     window.addEventListener("touchend", clearDragState, { passive: true });
+
+    if (typeof ResizeObserver !== "undefined" && els["pedalboard-stage"]) {
+      const stageObserver = new ResizeObserver(() => {
+        window.requestAnimationFrame(() => {
+          renderPatchCables();
+        });
+      });
+      stageObserver.observe(els["pedalboard-stage"]);
+    }
 
     // Bank tabs & search & factory lock
     document.querySelectorAll(".bank-tab").forEach((tab) => {
