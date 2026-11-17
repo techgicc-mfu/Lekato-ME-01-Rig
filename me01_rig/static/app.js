@@ -105,6 +105,11 @@
     renderedInspectorBlockId: null,
     renderedInspectorNamesSig: null,
     knobInputsByAddr: new Map(),
+    captureCategory: "amp",
+    captureFilter: "all",
+    captureSearch: "",
+    captureRenamingSlot: null,
+    curatedLibrary: null,
   };
 
   const els = {};
@@ -216,6 +221,19 @@
       "chk-restore-factory-confirm",
       "btn-batch-restore",
       "btn-close-backup",
+      "btn-open-capture-mgr",
+      "btn-drawer-open-capture-mgr",
+      "modal-capture-manager",
+      "tab-cap-amps",
+      "tab-cap-cabs",
+      "capture-slot-search",
+      "capture-slots-grid",
+      "capture-library-panel",
+      "capture-library-list",
+      "capture-lib-count",
+      "capture-file-dropzone",
+      "capture-file-input",
+      "capture-import-status",
       "toast-region",
     ];
     for (const id of ids) {
@@ -1243,6 +1261,362 @@
     if (!btn) return;
     btn.disabled = busy;
     btn.textContent = label;
+  }
+
+  function openCaptureManager(category = "amp") {
+    app.captureCategory = category;
+    app.captureRenamingSlot = null;
+    updateCaptureTabs();
+    openModal("modal-capture-manager");
+    renderCaptureManagerSlots();
+    if (!app.curatedLibrary) {
+      void fetchCuratedLibrary();
+    } else {
+      renderCaptureLibrary();
+    }
+  }
+
+  function closeCaptureManager() {
+    app.captureRenamingSlot = null;
+    closeModal("modal-capture-manager");
+  }
+
+  function updateCaptureTabs() {
+    const isAmp = app.captureCategory === "amp";
+    if (els["tab-cap-amps"]) {
+      els["tab-cap-amps"].classList.toggle("is-active", isAmp);
+      els["tab-cap-amps"].setAttribute("aria-selected", String(isAmp));
+    }
+    if (els["tab-cap-cabs"]) {
+      els["tab-cap-cabs"].classList.toggle("is-active", !isAmp);
+      els["tab-cap-cabs"].setAttribute("aria-selected", String(!isAmp));
+    }
+  }
+
+  async function fetchCuratedLibrary() {
+    try {
+      const data = await apiRequest("GET", "/api/models/library");
+      app.curatedLibrary = data.library || null;
+      renderCaptureLibrary();
+    } catch (err) {
+      console.warn("Failed to fetch curated library:", err);
+    }
+  }
+
+  function renderCaptureManagerSlots() {
+    const grid = els["capture-slots-grid"];
+    if (!grid) return;
+    grid.replaceChildren();
+
+    const isAmp = app.captureCategory === "amp";
+    const slots = isAmp ? (app.state?.amps || []) : (app.state?.cabs || []);
+    const activeBlockId = isAmp ? 1 : 5;
+    const activeBlock = getBlockById(app.state?.ram, activeBlockId);
+    const activeModelId = activeBlock ? activeBlock.model_id : -1;
+
+    const searchTerm = (app.captureSearch || "").trim().toLowerCase();
+    const filter = app.captureFilter || "all";
+
+    for (let slotIndex = 0; slotIndex < 20; slotIndex++) {
+      const rawName = slots[slotIndex] || `Slot ${slotIndex + 1}`;
+      const displayName = rawName.trim();
+      const isActive = slotIndex === activeModelId;
+
+      if (searchTerm && !displayName.toLowerCase().includes(searchTerm)) {
+        continue;
+      }
+      if (filter !== "all") {
+        const lowerName = displayName.toLowerCase();
+        let matchesFilter = false;
+        if (filter === "Overdrive" && (lowerName.includes("ts") || lowerName.includes("od") || lowerName.includes("rat") || lowerName.includes("ds") || lowerName.includes("dri") || lowerName.includes("dist") || lowerName.includes("gv2"))) {
+          matchesFilter = true;
+        } else if (filter === "Clean" && (lowerName.includes("clean") || lowerName.includes("twin") || lowerName.includes("delux") || lowerName.includes("ac30") || lowerName.includes("jc") || lowerName.includes("fend"))) {
+          matchesFilter = true;
+        } else if (filter === "Crunch" && (lowerName.includes("crunch") || lowerName.includes("plexi") || lowerName.includes("800") || lowerName.includes("brit") || lowerName.includes("jcm"))) {
+          matchesFilter = true;
+        } else if (filter === "High Gain" && (lowerName.includes("rect") || lowerName.includes("5150") || lowerName.includes("diez") || lowerName.includes("fire") || lowerName.includes("lead") || lowerName.includes("savage") || lowerName.includes("hiwatt"))) {
+          matchesFilter = true;
+        } else if (filter === "Bass" && (lowerName.includes("bass") || lowerName.includes("ampeg") || lowerName.includes("svt") || lowerName.includes("b15"))) {
+          matchesFilter = true;
+        }
+        if (!matchesFilter && isAmp) continue;
+      }
+
+      const card = document.createElement("div");
+      card.className = "capture-slot-card" + (isActive ? " is-active" : "");
+
+      const header = document.createElement("div");
+      header.className = "capture-slot-header";
+
+      const badgeLed = document.createElement("div");
+      badgeLed.className = "capture-slot-badge-led";
+
+      const badge = document.createElement("span");
+      badge.className = "capture-slot-badge";
+      badge.textContent = String(slotIndex + 1).padStart(2, "0");
+
+      const led = document.createElement("span");
+      led.className = "capture-slot-led" + (isActive ? " is-lit" : "");
+
+      badgeLed.appendChild(badge);
+      badgeLed.appendChild(led);
+      header.appendChild(badgeLed);
+
+      const actions = document.createElement("div");
+      actions.className = "capture-slot-actions";
+
+      const auditionBtn = document.createElement("button");
+      auditionBtn.type = "button";
+      auditionBtn.className = "capture-audition-btn";
+      auditionBtn.title = "Audicionar en vivo (RAM)";
+      auditionBtn.textContent = "🔊 Audition";
+      auditionBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        void auditionCaptureSlot(app.captureCategory, slotIndex);
+      });
+
+      const renameBtn = document.createElement("button");
+      renameBtn.type = "button";
+      renameBtn.className = "capture-rename-btn";
+      renameBtn.title = "Renombrar slot";
+      renameBtn.textContent = "✏️ Rename";
+      renameBtn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        app.captureRenamingSlot = slotIndex;
+        renderCaptureManagerSlots();
+      });
+
+      actions.appendChild(auditionBtn);
+      actions.appendChild(renameBtn);
+      header.appendChild(actions);
+      card.appendChild(header);
+
+      const body = document.createElement("div");
+      body.className = "capture-slot-body";
+
+      if (app.captureRenamingSlot === slotIndex) {
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "capture-rename-input";
+        input.value = displayName;
+        input.maxLength = 13;
+        input.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            const val = input.value.trim();
+            if (val) {
+              void renameCaptureSlot(app.captureCategory, slotIndex, val);
+            }
+          } else if (ev.key === "Escape") {
+            ev.preventDefault();
+            app.captureRenamingSlot = null;
+            renderCaptureManagerSlots();
+          }
+        });
+        input.addEventListener("blur", () => {
+          if (app.captureRenamingSlot === slotIndex) {
+            app.captureRenamingSlot = null;
+            renderCaptureManagerSlots();
+          }
+        });
+        body.appendChild(input);
+        window.requestAnimationFrame(() => input.focus());
+      } else {
+        const nameEl = document.createElement("div");
+        nameEl.className = "capture-slot-name";
+        nameEl.textContent = displayName;
+        nameEl.title = "Doble clic para renombrar";
+        nameEl.addEventListener("dblclick", () => {
+          app.captureRenamingSlot = slotIndex;
+          renderCaptureManagerSlots();
+        });
+        body.appendChild(nameEl);
+
+        const meta = document.createElement("div");
+        meta.className = "capture-slot-meta";
+
+        const tag = document.createElement("span");
+        tag.className = "capture-slot-tag";
+        tag.textContent = isAmp ? "Preamp / Capture" : "Cabinet IR";
+
+        const statusNote = document.createElement("span");
+        statusNote.textContent = isActive ? "ACTIVO EN RAM" : "";
+        if (isActive) statusNote.style.color = "var(--accent-cyan)";
+
+        meta.appendChild(tag);
+        meta.appendChild(statusNote);
+        body.appendChild(meta);
+      }
+
+      card.appendChild(body);
+      grid.appendChild(card);
+    }
+  }
+
+  async function auditionCaptureSlot(category, slotIndex) {
+    try {
+      const res = await apiRequest("POST", "/api/models/audition", {
+        category,
+        slot: slotIndex,
+      });
+      if (res && res.state) {
+        app.state = res.state;
+        renderAll();
+        showToast(`Audicionando Slot ${slotIndex + 1} en RAM`, "success");
+      }
+    } catch (err) {
+      showToast(`Error al audicionar slot: ${err.message}`, "error");
+    }
+  }
+
+  async function renameCaptureSlot(category, slotIndex, newName) {
+    try {
+      const res = await apiRequest("POST", "/api/models/rename", {
+        category,
+        slot: slotIndex,
+        name: newName,
+      });
+      if (res && res.state) {
+        app.state = res.state;
+        app.captureRenamingSlot = null;
+        renderAll();
+        showToast(`Slot ${slotIndex + 1} renombrado a "${res.name}"`, "success");
+      }
+    } catch (err) {
+      showToast(`Error al renombrar slot: ${err.message}`, "error");
+    }
+  }
+
+  function renderCaptureLibrary() {
+    const container = els["capture-library-list"];
+    const countBadge = els["capture-lib-count"];
+    if (!container || !app.curatedLibrary) return;
+    container.replaceChildren();
+
+    const isAmp = app.captureCategory === "amp";
+    const categories = app.curatedLibrary.categories || [];
+    let totalModels = 0;
+
+    categories.forEach((cat) => {
+      const catKind = cat.kind;
+      if ((isAmp && catKind !== "amp") || (!isAmp && catKind !== "cab")) {
+        return;
+      }
+
+      const groupTitle = document.createElement("div");
+      groupTitle.className = "capture-lib-group-title";
+      groupTitle.textContent = `${cat.name} (${cat.models.length})`;
+      container.appendChild(groupTitle);
+
+      cat.models.forEach((model) => {
+        totalModels++;
+        const item = document.createElement("div");
+        item.className = "capture-lib-item";
+
+        const info = document.createElement("div");
+        info.className = "capture-lib-item-info";
+
+        const name = document.createElement("div");
+        name.className = "capture-lib-item-name";
+        name.textContent = model.name;
+
+        const desc = document.createElement("div");
+        desc.className = "capture-lib-item-desc";
+        desc.textContent = model.description || "";
+
+        info.appendChild(name);
+        info.appendChild(desc);
+        item.appendChild(info);
+
+        const assignBtn = document.createElement("button");
+        assignBtn.type = "button";
+        assignBtn.className = "capture-lib-assign-btn";
+        assignBtn.textContent = "Renombrar slot activo";
+        assignBtn.title = `Asignar nombre "${model.name}" al slot activo en hardware`;
+        assignBtn.addEventListener("click", () => {
+          const activeBlockId = isAmp ? 1 : 5;
+          const activeBlock = getBlockById(app.state?.ram, activeBlockId);
+          const activeSlot = activeBlock ? activeBlock.model_id : 0;
+          void renameCaptureSlot(app.captureCategory, activeSlot, model.name);
+        });
+
+        item.appendChild(assignBtn);
+        container.appendChild(item);
+      });
+    });
+
+    if (countBadge) {
+      countBadge.textContent = String(totalModels);
+    }
+  }
+
+  async function validateAndImportCapture(file) {
+    const statusEl = els["capture-import-status"];
+    if (!statusEl) return;
+    statusEl.hidden = false;
+    statusEl.textContent = `Validando ${file.name}...`;
+
+    try {
+      const b64 = await readFileAsBase64(file);
+      const res = await apiRequest("POST", "/api/models/validate_import", {
+        filename: file.name,
+        content_base64: b64,
+      });
+
+      statusEl.replaceChildren();
+      const pSuccess = document.createElement("div");
+      pSuccess.style.color = "var(--success)";
+      pSuccess.textContent = `✅ Archivo válido: ${file.name}`;
+      statusEl.appendChild(pSuccess);
+
+      const pDetails = document.createElement("div");
+      if (res.kind === "cab" && res.details.sample_rate) {
+        pDetails.textContent = `IR WAV: ${res.details.sample_rate} Hz, ${res.details.bits_per_sample}-bit, ${res.details.channels} ch, ${res.details.total_samples} samples`;
+      } else {
+        pDetails.textContent = `Captura AM4: Modelo "${res.details.name}", tamaño ${res.details.payload_size} bytes`;
+      }
+      statusEl.appendChild(pDetails);
+
+      const assignBtn = document.createElement("button");
+      assignBtn.type = "button";
+      assignBtn.className = "btn btn-primary btn-sm";
+      assignBtn.style.marginTop = "6px";
+      const detectedName = res.details.name || file.name.replace(/\.[^/.]+$/, "");
+      assignBtn.textContent = `Renombrar slot activo a "${detectedName}"`;
+      assignBtn.addEventListener("click", () => {
+        const isAmp = res.kind === "amp";
+        const activeBlockId = isAmp ? 1 : 5;
+        const activeBlock = getBlockById(app.state?.ram, activeBlockId);
+        const activeSlot = activeBlock ? activeBlock.model_id : 0;
+        void renameCaptureSlot(res.kind, activeSlot, detectedName);
+      });
+      statusEl.appendChild(assignBtn);
+      showToast(`Archivo validado: ${detectedName}`, "success");
+    } catch (err) {
+      statusEl.replaceChildren();
+      const pError = document.createElement("div");
+      pError.style.color = "var(--danger)";
+      pError.textContent = `❌ Error de validación: ${err.message}`;
+      statusEl.appendChild(pError);
+      showToast(`Error al validar archivo: ${err.message}`, "error");
+    }
+  }
+
+  function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result;
+        if (typeof result === "string") {
+          const commaIdx = result.indexOf(",");
+          resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
+        } else {
+          reject(new Error("Formato de lectura inesperado"));
+        }
+      };
+      reader.onerror = () => reject(reader.error || new Error("Error leyendo archivo"));
+      reader.readAsDataURL(file);
+    });
   }
 
   function renderPorts() {
@@ -2475,6 +2849,9 @@
     if (!els["modal-backup"].hidden) {
       updateBackupRestoreButtons();
     }
+    if (els["modal-capture-manager"] && !els["modal-capture-manager"].hidden) {
+      renderCaptureManagerSlots();
+    }
   }
 
   function bindEvents() {
@@ -2713,6 +3090,77 @@
       els["effects-search"].addEventListener("input", () => renderEffectsLibrary());
     }
 
+    if (els["btn-open-capture-mgr"]) {
+      els["btn-open-capture-mgr"].addEventListener("click", () => openCaptureManager("amp"));
+    }
+    if (els["btn-drawer-open-capture-mgr"]) {
+      els["btn-drawer-open-capture-mgr"].addEventListener("click", () => {
+        toggleEffectsDrawer(false);
+        openCaptureManager("amp");
+      });
+    }
+
+    if (els["tab-cap-amps"]) {
+      els["tab-cap-amps"].addEventListener("click", () => {
+        app.captureCategory = "amp";
+        updateCaptureTabs();
+        renderCaptureManagerSlots();
+        renderCaptureLibrary();
+      });
+    }
+    if (els["tab-cap-cabs"]) {
+      els["tab-cap-cabs"].addEventListener("click", () => {
+        app.captureCategory = "cab";
+        updateCaptureTabs();
+        renderCaptureManagerSlots();
+        renderCaptureLibrary();
+      });
+    }
+
+    if (els["capture-slot-search"]) {
+      els["capture-slot-search"].addEventListener("input", () => {
+        app.captureSearch = els["capture-slot-search"].value;
+        renderCaptureManagerSlots();
+      });
+    }
+
+    document.querySelectorAll(".capture-filter-chips .chip").forEach((chip) => {
+      chip.addEventListener("click", () => {
+        app.captureFilter = chip.getAttribute("data-filter") || "all";
+        document.querySelectorAll(".capture-filter-chips .chip").forEach((c) => {
+          c.classList.toggle("is-active", c === chip);
+        });
+        renderCaptureManagerSlots();
+      });
+    });
+
+    if (els["capture-file-dropzone"]) {
+      const dropzone = els["capture-file-dropzone"];
+      dropzone.addEventListener("dragover", (ev) => {
+        ev.preventDefault();
+        dropzone.classList.add("is-dragover");
+      });
+      dropzone.addEventListener("dragleave", () => {
+        dropzone.classList.remove("is-dragover");
+      });
+      dropzone.addEventListener("drop", (ev) => {
+        ev.preventDefault();
+        dropzone.classList.remove("is-dragover");
+        if (ev.dataTransfer?.files?.length) {
+          void validateAndImportCapture(ev.dataTransfer.files[0]);
+        }
+      });
+    }
+
+    if (els["capture-file-input"]) {
+      els["capture-file-input"].addEventListener("change", (ev) => {
+        const file = ev.target.files?.[0];
+        if (file) {
+          void validateAndImportCapture(file);
+        }
+      });
+    }
+
     document.querySelectorAll("[data-close-modal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         closeModal(btn.getAttribute("data-close-modal"));
@@ -2733,8 +3181,8 @@
         return;
       }
       if (ev.key === "Escape") {
-        ["modal-save", "modal-revert", "modal-backup"].forEach((id) => {
-          if (!els[id].hidden) closeModal(id);
+        ["modal-save", "modal-revert", "modal-backup", "modal-capture-manager"].forEach((id) => {
+          if (els[id] && !els[id].hidden) closeModal(id);
         });
         if (els["effects-drawer"] && !els["effects-drawer"].hidden) {
           toggleEffectsDrawer(false);
@@ -2748,6 +3196,9 @@
       } else if (ev.key === "e" || ev.key === "E") {
         ev.preventDefault();
         toggleEffectsDrawer();
+      } else if (ev.key === "c" || ev.key === "C") {
+        ev.preventDefault();
+        openCaptureManager(app.captureCategory || "amp");
       }
     });
   }

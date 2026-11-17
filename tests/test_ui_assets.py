@@ -491,6 +491,52 @@ class UIAssetsTests(unittest.TestCase):
         ):
             self.assertIn(cls, css_text, f"Missing Capture Manager CSS class: {cls}")
 
+    def test_capture_manager_frontend_logic(self) -> None:
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. Functions defined
+        for fn in (
+            "openCaptureManager",
+            "closeCaptureManager",
+            "renderCaptureManagerSlots",
+            "renderCaptureLibrary",
+            "auditionCaptureSlot",
+            "renameCaptureSlot",
+            "validateAndImportCapture",
+        ):
+            self.assertIn(fn, js_text, f"Missing Capture Manager function: {fn}")
+
+        # 2. REST API endpoints called
+        for endpoint in (
+            "/api/models/library",
+            "/api/models/rename",
+            "/api/models/audition",
+            "/api/models/validate_import",
+        ):
+            self.assertIn(endpoint, js_text, f"Missing API endpoint in app.js: {endpoint}")
+
+        # 3. Cache element IDs
+        for el_id in (
+            "btn-open-capture-mgr",
+            "btn-drawer-open-capture-mgr",
+            "modal-capture-manager",
+            "tab-cap-amps",
+            "tab-cap-cabs",
+            "capture-slot-search",
+            "capture-slots-grid",
+            "capture-library-panel",
+            "capture-file-dropzone",
+            "capture-file-input",
+        ):
+            self.assertIn(f'"{el_id}"', js_text, f"Element ID {el_id} missing from cacheElements in app.js")
+
+        # 4. Keyboard shortcuts
+        self.assertIn('"modal-capture-manager"', js_text)
+        self.assertRegex(
+            js_text,
+            r'case\s+["\']KeyC["\']|key === ["\']c["\']|key === ["\']C["\']|ev\.code === ["\']KeyC["\']',
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
