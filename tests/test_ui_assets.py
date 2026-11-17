@@ -202,6 +202,13 @@ class UIAssetsTests(unittest.TestCase):
         self.assertNotIn(".innerHTML", js_text, "Use DOM APIs / textContent instead of innerHTML")
         self.assertNotIn("insertAdjacentHTML", js_text, "Avoid insertAdjacentHTML for XSS safety")
 
+    def test_ui_focus_and_restore_summary_guards(self) -> None:
+        js_text = APP_JS.read_text(encoding="utf-8")
+        self.assertIn("renderedInspectorKey", js_text)
+        self.assertIn("restoreSummaryText", js_text)
+        self.assertIn("app.knobQueue.get(addr) !== entry", js_text)
+        self.assertIn('event.target.value = ""', js_text)
+
 
 if __name__ == "__main__":
     unittest.main()

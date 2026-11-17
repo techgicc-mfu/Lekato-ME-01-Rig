@@ -97,8 +97,12 @@
     backupSelectedSlots: new Set(),
     backupSlotStatus: new Map(),
     restoreRunning: false,
+    restoreSummaryText: null,
     pollTimerId: null,
     pollInFlight: false,
+    renderedInspectorKey: null,
+    renderedInspectorBlockId: null,
+    renderedInspectorNamesSig: null,
     knobInputsByAddr: new Map(),
   };
 
@@ -383,18 +387,23 @@
     }
   }
 
-  function updateKnobVisualsInPlace(addr, rawValue) {
+  function updateKnobVisualsInPlace(addr, rawValue, { fromLocal = false } = {}) {
     const val = clampInt(rawValue, 0, 100);
     if (addr === 0) {
-      setSliderVisual(els["patch-vol-slider"], val);
-      if (document.activeElement !== els["patch-vol-number"]) {
-        els["patch-vol-number"].value = String(val);
+      if (fromLocal || (app.activeDragAddr !== 0 && !app.knobQueue.has(0))) {
+        setSliderVisual(els["patch-vol-slider"], val);
+        if (document.activeElement !== els["patch-vol-number"]) {
+          els["patch-vol-number"].value = String(val);
+        }
       }
       return;
     }
 
     const refs = app.knobInputsByAddr.get(addr);
     if (refs) {
+      if (!fromLocal && (app.activeDragAddr === addr || app.knobQueue.has(addr))) {
+        return;
+      }
       setSliderVisual(refs.slider, val);
       if (document.activeElement !== refs.numberInput) {
         refs.numberInput.value = String(val);
@@ -425,7 +434,7 @@
 
     if (app.state?.ram) {
       applyLocalKnobToState(app.state, addr, val);
-      updateKnobVisualsInPlace(addr, val);
+      updateKnobVisualsInPlace(addr, val, { fromLocal: true });
     }
 
     let entry = app.knobQueue.get(addr);
@@ -459,6 +468,7 @@
   }
 
   async function flushKnobEntry(addr, entry) {
+    if (app.knobQueue.get(addr) !== entry) return;
     const sendVal = entry.value;
     entry.inFlight = true;
     entry.queuedValue = null;
@@ -468,13 +478,17 @@
         addr,
         value: sendVal,
       });
+      if (app.knobQueue.get(addr) !== entry) return;
       if (entry.queuedValue === null && entry.timerId === null) {
         applyServerState(nextState, { preserveLocalKnobs: true });
       }
     } catch (err) {
-      showError(err.message);
+      if (app.knobQueue.get(addr) === entry) {
+        showError(err.message);
+      }
     } finally {
       entry.inFlight = false;
+      if (app.knobQueue.get(addr) !== entry) return;
       if (entry.queuedValue !== null) {
         const nextVal = entry.queuedValue;
         entry.queuedValue = null;
@@ -849,6 +863,7 @@
   }
 
   async function handleExportBackup() {
+    if (app.restoreRunning) return;
     setBusyButton(els["btn-export-backup"], true, "Exporting...");
     try {
       const data = await apiRequest("GET", "/api/backup/export");
@@ -906,7 +921,12 @@
   }
 
   function handleBackupFileSelected(event) {
+    if (app.restoreRunning) {
+      event.target.value = "";
+      return;
+    }
     const file = event.target.files?.[0];
+    event.target.value = "";
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
@@ -923,6 +943,7 @@
         app.backupDecodedSlots = decoded;
         app.backupSelectedSlots = new Set();
         app.backupSlotStatus = new Map();
+        app.restoreSummaryText = null;
         els["chk-restore-factory-confirm"].checked = false;
         els["restore-progress-bar"].style.width = "0%";
         els["restore-progress-text"].textContent = "0 selected";
@@ -967,6 +988,7 @@
     }
 
     app.restoreRunning = true;
+    app.restoreSummaryText = null;
     app.backupSlotStatus.clear();
     for (const id of slotIds) {
       app.backupSlotStatus.set(id, { state: "pending", text: "Pending" });
@@ -991,12 +1013,14 @@
           });
           completed += 1;
           app.backupSlotStatus.set(slotId, { state: "verified", text: "Verified" });
+          app.restoreSummaryText = `${completed}/${total} verified`;
           els["restore-progress-bar"].style.width = `${Math.round((completed / total) * 100)}%`;
-          els["restore-progress-text"].textContent = `${completed}/${total} verified`;
+          els["restore-progress-text"].textContent = app.restoreSummaryText;
           applyServerState(result);
         } catch (err) {
           app.backupSlotStatus.set(slotId, { state: "failed", text: "Failed" });
-          els["restore-progress-text"].textContent = `Stopped at ${formatSlotLabel(slotId)} (${completed}/${total} verified)`;
+          app.restoreSummaryText = `Stopped at ${formatSlotLabel(slotId)} (${completed}/${total} verified)`;
+          els["restore-progress-text"].textContent = app.restoreSummaryText;
           showError(err.message);
           showToast(`Restore halted on ${formatSlotLabel(slotId)}: ${err.message}`, "error");
           break;
@@ -1004,6 +1028,7 @@
       }
 
       if (completed === total) {
+        app.restoreSummaryText = `${completed}/${total} verified`;
         showToast(`Batch Flash Restore verified ${total} slot(s).`, "success");
       }
     } finally {
@@ -1053,6 +1078,7 @@
       checkbox.disabled = app.restoreRunning;
       checkbox.setAttribute("aria-label", `Select ${formatSlotLabel(idx)} for restore`);
       checkbox.addEventListener("change", () => {
+        app.restoreSummaryText = null;
         if (checkbox.checked) {
           app.backupSelectedSlots.add(idx);
         } else {
@@ -1132,7 +1158,8 @@
     const warning = els["restore-factory-warning"];
 
     if (!app.restoreRunning) {
-      els["restore-progress-text"].textContent = `${selected.length} selected`;
+      els["restore-progress-text"].textContent =
+        app.restoreSummaryText || `${selected.length} selected`;
     }
 
     const confirmWrap = els["restore-factory-confirm-wrap"];
@@ -1159,6 +1186,13 @@
     els["btn-batch-restore"].disabled =
       app.restoreRunning || !sessionActive || selected.length === 0 || factoryNeedsConfirm;
     els["btn-close-backup"].disabled = app.restoreRunning;
+    els["btn-export-backup"].disabled = app.restoreRunning;
+    els["backup-file-input"].disabled = app.restoreRunning;
+    const fileLabel = els["backup-file-input"].closest("label");
+    if (fileLabel) {
+      fileLabel.style.opacity = app.restoreRunning ? "0.42" : "";
+      fileLabel.style.pointerEvents = app.restoreRunning ? "none" : "";
+    }
     els["btn-select-user-slots"].disabled = app.restoreRunning;
     els["btn-select-changed-slots"].disabled = app.restoreRunning;
     els["btn-select-all-slots"].disabled = app.restoreRunning;
@@ -1245,7 +1279,7 @@
     const volume = st?.ram ? st.ram.volume : 0;
     els["patch-vol-slider"].disabled = !sessionActive || !st?.ram;
     els["patch-vol-number"].disabled = !sessionActive || !st?.ram;
-    if (app.activeDragAddr !== 0) {
+    if (app.activeDragAddr !== 0 && !app.knobQueue.has(0)) {
       setSliderVisual(els["patch-vol-slider"], volume);
       if (document.activeElement !== els["patch-vol-number"]) {
         els["patch-vol-number"].value = String(volume);
@@ -1610,12 +1644,10 @@
     if (!ram || !block || !spec) {
       els["inspector-empty"].hidden = false;
       els["inspector-content"].hidden = true;
+      app.renderedInspectorKey = null;
+      app.renderedInspectorBlockId = null;
+      app.renderedInspectorNamesSig = null;
       app.knobInputsByAddr.clear();
-      return;
-    }
-
-    // Avoid rebuilding the slider DOM while user is actively dragging a knob inside this inspector
-    if (app.activeDragAddr !== null && app.activeDragAddr !== 0) {
       return;
     }
 
@@ -1637,16 +1669,27 @@
     bypassBtn.setAttribute("aria-pressed", String(block.enabled));
 
     const modelSelect = els["inspector-model-select"];
-    modelSelect.replaceChildren();
     const models = getModelListForBlock(block.block_id, app.state);
-    for (const mdl of models) {
-      const opt = document.createElement("option");
-      opt.value = String(mdl.id);
-      const idxTag = String(mdl.id).padStart(2, "0");
-      opt.textContent = mdl.minFw ? `${idxTag}: ${mdl.name} (V${mdl.minFw}+)` : `${idxTag}: ${mdl.name}`;
-      modelSelect.appendChild(opt);
+    const namesSig = models.map((m) => `${m.id}:${m.name}`).join("|");
+    if (
+      app.renderedInspectorBlockId !== block.block_id ||
+      app.renderedInspectorNamesSig !== namesSig ||
+      modelSelect.options.length !== models.length
+    ) {
+      modelSelect.replaceChildren();
+      for (const mdl of models) {
+        const opt = document.createElement("option");
+        opt.value = String(mdl.id);
+        const idxTag = String(mdl.id).padStart(2, "0");
+        opt.textContent = mdl.minFw ? `${idxTag}: ${mdl.name} (V${mdl.minFw}+)` : `${idxTag}: ${mdl.name}`;
+        modelSelect.appendChild(opt);
+      }
+      app.renderedInspectorBlockId = block.block_id;
+      app.renderedInspectorNamesSig = namesSig;
     }
-    modelSelect.value = String(block.model_id);
+    if (document.activeElement !== modelSelect) {
+      modelSelect.value = String(block.model_id);
+    }
 
     // Special DLY Tempo & CAB High Cut notes
     els["delay-tempo-strip"].hidden = block.block_id !== 3;
@@ -1655,9 +1698,23 @@
     }
     els["cab-scale-note"].hidden = block.block_id !== 5;
 
+    const inspectorKey = `${block.block_id}:${block.model_id}`;
     const knobsContainer = els["inspector-knobs"];
+    const canReuseKnobs =
+      app.renderedInspectorKey === inspectorKey &&
+      knobsContainer.children.length === block.knobs.length &&
+      block.knobs.every((k) => app.knobInputsByAddr.has(k.addr));
+
+    if (canReuseKnobs) {
+      for (const knob of block.knobs) {
+        updateKnobVisualsInPlace(knob.addr, knob.raw, { fromLocal: false });
+      }
+      return;
+    }
+
     knobsContainer.replaceChildren();
     app.knobInputsByAddr.clear();
+    app.renderedInspectorKey = inspectorKey;
 
     for (const knob of block.knobs) {
       const card = document.createElement("div");
@@ -1818,6 +1875,11 @@
       if (app.activeDragAddr === 0) app.activeDragAddr = null;
       scheduleKnobWrite(0, volSlider.value, true);
     });
+    volNum.addEventListener("input", () => {
+      const rawText = volNum.value.trim();
+      if (rawText === "") return;
+      scheduleKnobWrite(0, rawText, false);
+    });
     volNum.addEventListener("change", () => {
       const clamped = clampInt(volNum.value, 0, 100);
       volNum.value = String(clamped);
@@ -1847,6 +1909,7 @@
     });
     els["backup-file-input"].addEventListener("change", handleBackupFileSelected);
     els["btn-select-user-slots"].addEventListener("click", () => {
+      app.restoreSummaryText = null;
       app.backupSelectedSlots.clear();
       for (let i = FACTORY_SLOT_COUNT; i < TOTAL_SLOTS; i += 1) {
         app.backupSelectedSlots.add(i);
@@ -1854,6 +1917,7 @@
       renderBackupModalList();
     });
     els["btn-select-changed-slots"].addEventListener("click", () => {
+      app.restoreSummaryText = null;
       app.backupSelectedSlots.clear();
       const currentSummaries = app.state?.presets_summary || [];
       for (let i = 0; i < app.backupDecodedSlots.length; i += 1) {
@@ -1867,6 +1931,7 @@
       renderBackupModalList();
     });
     els["btn-select-all-slots"].addEventListener("click", () => {
+      app.restoreSummaryText = null;
       app.backupSelectedSlots.clear();
       for (let i = 0; i < TOTAL_SLOTS; i += 1) {
         app.backupSelectedSlots.add(i);
@@ -1874,6 +1939,7 @@
       renderBackupModalList();
     });
     els["btn-clear-slot-selection"].addEventListener("click", () => {
+      app.restoreSummaryText = null;
       app.backupSelectedSlots.clear();
       renderBackupModalList();
     });
