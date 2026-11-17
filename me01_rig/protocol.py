@@ -488,30 +488,33 @@ def parse_wav_header(data: bytes) -> dict[str, Any]:
     bits_per_sample = 24
     num_samples = 0
 
-    while idx + 8 <= len(raw):
-        chunk_id = raw[idx : idx + 4]
-        chunk_size = struct.unpack_from("<I", raw, idx + 4)[0]
-        idx += 8
-        if chunk_id == b"fmt ":
-            if chunk_size < 16:
-                raise ProtocolError(f"Malformed fmt chunk size: {chunk_size}")
-            fmt_found = True
-            audio_format, channels, sample_rate, byte_rate, block_align, bits_per_sample = (
-                struct.unpack_from("<HHIIHH", raw, idx)
-            )
-            if audio_format not in (1, 3):
-                raise ProtocolError(f"Unsupported WAV audio format: {audio_format}")
-        elif chunk_id == b"data":
-            data_found = True
-            bytes_per_sample = bits_per_sample // 8 if bits_per_sample else 2
-            channel_count = channels if channels else 1
-            num_samples = (
-                chunk_size // (bytes_per_sample * channel_count)
-                if (bytes_per_sample * channel_count)
-                else 0
-            )
-            break
-        idx += chunk_size
+    try:
+        while idx + 8 <= len(raw):
+            chunk_id = raw[idx : idx + 4]
+            chunk_size = struct.unpack_from("<I", raw, idx + 4)[0]
+            idx += 8
+            if chunk_id == b"fmt ":
+                if chunk_size < 16:
+                    raise ProtocolError(f"Malformed fmt chunk size: {chunk_size}")
+                fmt_found = True
+                audio_format, channels, sample_rate, byte_rate, block_align, bits_per_sample = (
+                    struct.unpack_from("<HHIIHH", raw, idx)
+                )
+                if audio_format not in (1, 3):
+                    raise ProtocolError(f"Unsupported WAV audio format: {audio_format}")
+            elif chunk_id == b"data":
+                data_found = True
+                bytes_per_sample = bits_per_sample // 8 if bits_per_sample else 2
+                channel_count = channels if channels else 1
+                num_samples = (
+                    chunk_size // (bytes_per_sample * channel_count)
+                    if (bytes_per_sample * channel_count)
+                    else 0
+                )
+                break
+            idx += chunk_size + (chunk_size & 1)
+    except struct.error as exc:
+        raise ProtocolError(f"Malformed or truncated WAV header: {exc}") from exc
 
     if not fmt_found or not data_found:
         raise ProtocolError("WAV file missing required fmt or data chunks")

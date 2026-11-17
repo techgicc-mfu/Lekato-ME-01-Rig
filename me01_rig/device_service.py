@@ -40,6 +40,7 @@ from .protocol import (
     build_save_flash,
     build_toggle_block,
     decode_name_table,
+    encode_name_record,
     is_ack_frame,
     parse_frame,
     unwrap_sysex,
@@ -831,6 +832,8 @@ class DeviceService:
             raise ProtocolError("Slot name cannot be empty")
         slot_idx = _require_range(slot, 0, NAME_RECORD_COUNT - 1, "slot")
         frame = build_rename_slot(cat, slot_idx, clean_name)
+        encoded_rec = encode_name_record(clean_name)
+        normalized_name = encoded_rec.split(b"\x00", 1)[0].decode("ascii", errors="replace")
 
         with self._op_lock:
             transport = self._require_active_session()
@@ -854,17 +857,17 @@ class DeviceService:
                 with self._state_lock:
                     target_list = self._amps if cat == "amp" else self._cabs
                     if slot_idx < len(target_list):
-                        target_list[slot_idx] = clean_name[:13]
+                        target_list[slot_idx] = normalized_name
                     else:
                         while len(target_list) < slot_idx:
                             target_list.append(f"{cat.upper()} {len(target_list) + 1}")
-                        target_list.append(clean_name[:13])
+                        target_list.append(normalized_name)
 
             return {
                 "ok": True,
                 "category": cat,
                 "slot": slot_idx,
-                "name": clean_name[:13],
+                "name": normalized_name,
                 "state": self.get_state(),
             }
 

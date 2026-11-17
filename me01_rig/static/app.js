@@ -1518,25 +1518,27 @@
 
         const name = document.createElement("div");
         name.className = "capture-lib-item-name";
-        name.textContent = model.name;
+        name.textContent = model.display_name ? `${model.display_name} (${model.name})` : model.name;
 
         const desc = document.createElement("div");
         desc.className = "capture-lib-item-desc";
-        desc.textContent = model.description || "";
+        desc.textContent = model.desc || model.description || "";
 
         info.appendChild(name);
         info.appendChild(desc);
         item.appendChild(info);
 
+        const activeBlockId = isAmp ? 1 : 5;
+        const activeBlock = getBlockById(app.state?.ram, activeBlockId);
+        const activeSlot = activeBlock ? activeBlock.model_id : 0;
+        const slotLabel = `Slot ${String(activeSlot + 1).padStart(2, "0")}`;
+
         const assignBtn = document.createElement("button");
         assignBtn.type = "button";
         assignBtn.className = "capture-lib-assign-btn";
-        assignBtn.textContent = "Renombrar slot activo";
-        assignBtn.title = `Asignar nombre "${model.name}" al slot activo en hardware`;
+        assignBtn.textContent = `Asignar a ${slotLabel}`;
+        assignBtn.title = `Asignar nombre "${model.name}" al ${slotLabel} activo en hardware`;
         assignBtn.addEventListener("click", () => {
-          const activeBlockId = isAmp ? 1 : 5;
-          const activeBlock = getBlockById(app.state?.ram, activeBlockId);
-          const activeSlot = activeBlock ? activeBlock.model_id : 0;
           void renameCaptureSlot(app.captureCategory, activeSlot, model.name);
         });
 
@@ -1570,24 +1572,28 @@
       statusEl.appendChild(pSuccess);
 
       const pDetails = document.createElement("div");
+      const sampleCount = res.details.samples ?? res.details.total_samples ?? 0;
+      const byteSize = res.details.size ?? res.details.payload_size ?? 0;
       if (res.kind === "cab" && res.details.sample_rate) {
-        pDetails.textContent = `IR WAV: ${res.details.sample_rate} Hz, ${res.details.bits_per_sample}-bit, ${res.details.channels} ch, ${res.details.total_samples} samples`;
+        pDetails.textContent = `IR WAV: ${res.details.sample_rate} Hz, ${res.details.bits_per_sample}-bit, ${res.details.channels} ch, ${sampleCount} samples (${byteSize} bytes)`;
       } else {
-        pDetails.textContent = `Captura AM4: Modelo "${res.details.name}", tamaño ${res.details.payload_size} bytes`;
+        pDetails.textContent = `Captura AM4: Modelo "${res.details.name}", tamaño ${byteSize} bytes`;
       }
       statusEl.appendChild(pDetails);
+
+      const isAmp = res.kind === "amp";
+      const activeBlockId = isAmp ? 1 : 5;
+      const activeBlock = getBlockById(app.state?.ram, activeBlockId);
+      const activeSlot = activeBlock ? activeBlock.model_id : 0;
+      const slotLabel = `Slot ${String(activeSlot + 1).padStart(2, "0")}`;
 
       const assignBtn = document.createElement("button");
       assignBtn.type = "button";
       assignBtn.className = "btn btn-primary btn-sm";
       assignBtn.style.marginTop = "6px";
       const detectedName = res.details.name || file.name.replace(/\.[^/.]+$/, "");
-      assignBtn.textContent = `Renombrar slot activo a "${detectedName}"`;
+      assignBtn.textContent = `Asignar "${detectedName}" a ${slotLabel}`;
       assignBtn.addEventListener("click", () => {
-        const isAmp = res.kind === "amp";
-        const activeBlockId = isAmp ? 1 : 5;
-        const activeBlock = getBlockById(app.state?.ram, activeBlockId);
-        const activeSlot = activeBlock ? activeBlock.model_id : 0;
         void renameCaptureSlot(res.kind, activeSlot, detectedName);
       });
       statusEl.appendChild(assignBtn);

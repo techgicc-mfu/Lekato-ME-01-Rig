@@ -575,6 +575,11 @@ class DeviceServiceTests(unittest.TestCase):
         self.assertEqual(res_amp["name"], "TS9 Clean")
         self.assertEqual(svc.get_state()["amps"][0], "TS9 Clean")
 
+        # Demo mode normalizes non-ASCII and truncates to 13 chars exactly like hardware
+        res_long = svc.rename_slot("amp", 1, "VeryLongNameExceeding13Chars")
+        self.assertEqual(res_long["name"], "VeryLongNameE")
+        self.assertEqual(svc.get_state()["amps"][1], "VeryLongNameE")
+
         # 2. Demo mode rename CAB slot 3
         res_cab = svc.rename_slot("cab", 3, "Mesa 4x12 V30")
         self.assertTrue(res_cab["ok"])

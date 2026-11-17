@@ -451,6 +451,16 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status_bad, 400)
         self.assertIn("error", bad_body)
 
+        # Invalid non-string name returns 400
+        status_nonstr, _, nonstr_body = self._json_request(
+            port,
+            "POST",
+            "/api/models/rename",
+            {"category": "amp", "slot": 1, "name": 12345},
+        )
+        self.assertEqual(status_nonstr, 400)
+        self.assertIn("error", nonstr_body)
+
         # 3. POST /api/models/audition
         status_aud, _, aud_body = self._json_request(
             port,

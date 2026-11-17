@@ -458,6 +458,29 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             parse_wav_header(b"NOT_A_WAV_FILE")
 
+        # Rejects truncated WAV (struct.error converted to ProtocolError)
+        truncated_wav = (
+            b"RIFF\x30\x00\x00\x00WAVE"
+            + b"JUNK\x10\x00\x00\x00"
+            + (b"\x00" * 16)
+            + b"fmt \x10\x00\x00\x00\x01\x00"
+        )
+        with self.assertRaises(ProtocolError) as ctx:
+            parse_wav_header(truncated_wav)
+        self.assertIn("truncated", str(ctx.exception).lower())
+
+        # Handles odd-length chunk with 2-byte word padding
+        odd_chunk_wav = (
+            b"RIFF\x48\x00\x00\x00WAVE"
+            b"JUNK\x03\x00\x00\x00abc\x00"  # 3 bytes + 1 padding byte
+            b"fmt \x10\x00\x00\x00"
+            + struct.pack("<HHIIHH", 1, channels, sample_rate, byte_rate, block_align, bits)
+            + b"data\x08\x00\x00\x00" + b"\x00" * 8
+        )
+        meta_odd = parse_wav_header(odd_chunk_wav)
+        self.assertEqual(meta_odd["sample_rate"], 48000)
+        self.assertTrue(meta_odd["valid"])
+
 
 if __name__ == "__main__":
     unittest.main()

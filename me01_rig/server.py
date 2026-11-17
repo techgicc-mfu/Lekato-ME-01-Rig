@@ -292,14 +292,14 @@ class ME01RequestHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/models/rename":
-            category = str(body.get("category", "")).strip()
+            category = _require_str_field(body, "category").strip()
             slot = _require_int_field(body, "slot")
-            name = str(body.get("name", "")).strip()
+            name = _require_str_field(body, "name").strip()
             self._send_json(200, svc.rename_slot(category, slot, name))
             return
 
         if path == "/api/models/audition":
-            category = str(body.get("category", "")).strip()
+            category = _require_str_field(body, "category").strip()
             slot = _require_int_field(body, "slot")
             self._send_json(200, svc.audition_slot(category, slot))
             return

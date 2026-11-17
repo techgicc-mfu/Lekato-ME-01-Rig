@@ -537,6 +537,12 @@ class UIAssetsTests(unittest.TestCase):
             r'case\s+["\']KeyC["\']|key === ["\']c["\']|key === ["\']C["\']|ev\.code === ["\']KeyC["\']',
         )
 
+        # 5. Review findings fixes: display_name, desc, and sample/size resolution
+        self.assertIn("model.display_name", js_text)
+        self.assertIn("model.desc", js_text)
+        self.assertIn("res.details.samples", js_text)
+        self.assertIn("res.details.size", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()
