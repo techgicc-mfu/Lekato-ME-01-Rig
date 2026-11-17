@@ -1621,6 +1621,165 @@ body {
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.22);
 }
 
+/* --------------------------------------------------------------------------
+   Effects Library Drawer & Collapsible Presets Drawer
+   -------------------------------------------------------------------------- */
+
+.drawer-panel {
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+  z-index: 10;
+}
+
+.drawer-panel.drawer-left:not(.drawer-open) {
+  display: none !important;
+}
+
+.drawer-panel.drawer-right {
+  width: 320px;
+  min-width: 320px;
+  background: #14171c;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer-search-wrap {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.effects-categories-list {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  gap: 10px;
+}
+
+.effects-category {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #181c22;
+  overflow: hidden;
+}
+
+.effects-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #1d2128;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid transparent;
+}
+
+.effects-category.is-open .effects-category-header {
+  border-bottom-color: var(--border);
+}
+
+.effects-category-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 140ms ease;
+}
+
+.effects-category.is-open .effects-category-chevron {
+  transform: rotate(90deg);
+}
+
+.effects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+
+.effects-category:not(.is-open) .effects-grid {
+  display: none;
+}
+
+.effect-card-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 7px;
+  background: #14171c;
+  border: 1px solid #2a313d;
+  cursor: pointer;
+  transition: all 120ms ease;
+  text-align: center;
+  user-select: none;
+}
+
+.effect-card-tile:hover {
+  border-color: var(--accent-cyan);
+  background: #1e242d;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.effect-card-tile.is-active {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.14);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
+}
+
+.effect-tile-icon {
+  width: 32px;
+  height: 44px;
+  border-radius: 4px;
+  background: var(--tile-color, #38bdf8);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.effect-tile-icon::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0f172a;
+}
+
+.effect-tile-name {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.effect-tile-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--accent-gold-dim);
+  color: var(--accent-gold);
+}
+
 /* AMP head SVG colors */
 .svg-amp-cabinet {
   fill: #2d2219;

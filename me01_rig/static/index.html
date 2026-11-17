@@ -25,6 +25,7 @@
             <option value="">Auto-detect USB-MIDI</option>
           </select>
           <button id="btn-refresh-ports" type="button" class="btn btn-ghost btn-sm" title="Rescan MIDI ports">Scan</button>
+          <button id="btn-toggle-presets" type="button" class="btn btn-secondary btn-sm" title="Toggle Presets Drawer (P)">Presets (P)</button>
           <button id="btn-connect" type="button" class="btn btn-secondary btn-sm">Connect</button>
           <button id="btn-demo" type="button" class="btn btn-ghost btn-sm">Demo</button>
           <button id="btn-disconnect" type="button" class="btn btn-ghost btn-sm" hidden>Disconnect</button>
@@ -51,6 +52,7 @@
           </button>
           <button id="btn-revert" type="button" class="btn btn-ghost btn-sm" disabled>Revert</button>
           <button id="btn-backup" type="button" class="btn btn-secondary btn-sm" disabled>Backup</button>
+          <button id="btn-toggle-effects" type="button" class="btn btn-secondary btn-sm" title="Toggle Effects Library (E)">Effects (E)</button>
           <button id="btn-save-slot" type="button" class="btn btn-primary btn-sm" disabled>Save to Slot</button>
         </div>
       </div>
@@ -62,7 +64,7 @@
     </div>
 
     <div class="workspace">
-      <aside class="sidebar" aria-label="Preset Bank">
+      <aside id="presets-drawer" class="sidebar drawer-panel drawer-left drawer-open" aria-label="Preset Bank">
         <div class="sidebar-header">
           <div>
             <h2 class="panel-title">Presets</h2>
@@ -262,6 +264,23 @@
           </div>
         </section>
       </main>
+
+      <!-- Effects Library Drawer (Collapsible Right) -->
+      <aside id="effects-drawer" class="drawer-panel drawer-right" aria-label="Effects Library Drawer" hidden>
+        <div class="drawer-header">
+          <div>
+            <h2 class="panel-title">Biblioteca de efectos</h2>
+            <p class="panel-subtitle">43 Built-in DSP Models</p>
+          </div>
+          <button id="btn-close-effects" type="button" class="btn-icon" aria-label="Close Effects Library">&times;</button>
+        </div>
+
+        <div class="drawer-search-wrap">
+          <input id="effects-search" class="text-input" type="search" placeholder="Search effects &amp; models...">
+        </div>
+
+        <div id="effects-categories-list" class="effects-categories-list"></div>
+      </aside>
     </div>
   </div>
 

@@ -359,6 +359,35 @@ class UIAssetsTests(unittest.TestCase):
         self.assertIn("setSectionTab", js_text)
         self.assertIn("renderSignalFlowMinimap", js_text)
 
+    def test_effects_library_and_presets_drawer(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #effects-drawer, #presets-drawer, #effects-search in index.html
+        self.assertIn('id="effects-drawer"', html_text)
+        self.assertIn('id="presets-drawer"', html_text)
+        self.assertIn('id="effects-search"', html_text)
+
+        # 2. Toggle buttons exist
+        self.assertIn('id="btn-toggle-presets"', html_text)
+        self.assertIn('id="btn-toggle-effects"', html_text)
+
+        # 3. CSS drawer classes
+        for cls in (
+            "drawer-panel",
+            "drawer-open",
+            "effects-category",
+            "effects-grid",
+            "effect-card-tile",
+        ):
+            self.assertIn(cls, css_text, f"Missing drawer CSS class: {cls}")
+
+        # 4. Keyboard shortcuts and drawer handlers in app.js
+        self.assertIn("togglePresetsDrawer", js_text)
+        self.assertIn("toggleEffectsDrawer", js_text)
+        self.assertIn("renderEffectsLibrary", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()

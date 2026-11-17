@@ -131,6 +131,13 @@
       "error-banner",
       "error-banner-text",
       "btn-dismiss-error",
+      "presets-drawer",
+      "effects-drawer",
+      "btn-toggle-presets",
+      "btn-toggle-effects",
+      "btn-close-effects",
+      "effects-search",
+      "effects-categories-list",
       "preset-count-badge",
       "preset-search",
       "chk-unlock-factory",
@@ -2288,6 +2295,152 @@
     }
   }
 
+  function togglePresetsDrawer(forceState) {
+    const drawer = els["presets-drawer"];
+    if (!drawer) return;
+    const willOpen = typeof forceState === "boolean" ? forceState : !drawer.classList.contains("drawer-open");
+    drawer.classList.toggle("drawer-open", willOpen);
+    if (els["btn-toggle-presets"]) {
+      els["btn-toggle-presets"].classList.toggle("is-active", willOpen);
+    }
+    window.requestAnimationFrame(() => renderPatchCables());
+  }
+
+  function toggleEffectsDrawer(forceState) {
+    const drawer = els["effects-drawer"];
+    if (!drawer) return;
+    const willOpen = typeof forceState === "boolean" ? forceState : drawer.hidden;
+    drawer.hidden = !willOpen;
+    if (willOpen) {
+      renderEffectsLibrary();
+    }
+    if (els["btn-toggle-effects"]) {
+      els["btn-toggle-effects"].classList.toggle("is-active", willOpen);
+    }
+    window.requestAnimationFrame(() => renderPatchCables());
+  }
+
+  function renderEffectsLibrary() {
+    const container = els["effects-categories-list"];
+    if (!container) return;
+    container.replaceChildren();
+
+    const query = (els["effects-search"]?.value || "").trim().toLowerCase();
+    const ram = app.state?.ram;
+
+    const categories = [
+      {
+        id: "dinamica",
+        name: "Dinámica & Pre-effects",
+        blockId: 0,
+        color: "var(--block-fx)",
+        models: getModelListForBlock(0, app.state),
+      },
+      {
+        id: "drive-amp",
+        name: "Preamps & Amps",
+        blockId: 1,
+        color: "var(--block-amp)",
+        models: getModelListForBlock(1, app.state),
+      },
+      {
+        id: "modulacion",
+        name: "Modulación",
+        blockId: 2,
+        color: "var(--block-mod)",
+        models: getModelListForBlock(2, app.state),
+      },
+      {
+        id: "delay",
+        name: "Delay",
+        blockId: 3,
+        color: "var(--block-dly)",
+        models: getModelListForBlock(3, app.state),
+      },
+      {
+        id: "reverb",
+        name: "Reverb",
+        blockId: 4,
+        color: "var(--block-rev)",
+        models: getModelListForBlock(4, app.state),
+      },
+      {
+        id: "cab",
+        name: "Cabinets & IRs",
+        blockId: 5,
+        color: "var(--block-cab)",
+        models: getModelListForBlock(5, app.state),
+      },
+    ];
+
+    categories.forEach((cat) => {
+      const filtered = cat.models.filter((m) => {
+        if (!query) return true;
+        return m.name.toLowerCase().includes(query) || cat.name.toLowerCase().includes(query);
+      });
+
+      if (query && filtered.length === 0) return;
+
+      const catEl = document.createElement("div");
+      catEl.className = "effects-category is-open";
+
+      const header = document.createElement("div");
+      header.className = "effects-category-header";
+
+      const title = document.createElement("span");
+      title.textContent = `${cat.name} (${filtered.length})`;
+
+      const chevron = document.createElement("span");
+      chevron.className = "effects-category-chevron";
+      chevron.textContent = "▶";
+
+      header.append(title, chevron);
+      header.addEventListener("click", () => {
+        catEl.classList.toggle("is-open");
+      });
+
+      const grid = document.createElement("div");
+      grid.className = "effects-grid";
+
+      const currentBlock = ram ? getBlockById(ram, cat.blockId) : null;
+
+      filtered.forEach((model) => {
+        const isCurrent = currentBlock?.model_id === model.id;
+        const tile = document.createElement("button");
+        tile.type = "button";
+        tile.className = `effect-card-tile${isCurrent ? " is-active" : ""}`;
+        tile.style.setProperty("--tile-color", cat.color);
+
+        const icon = document.createElement("span");
+        icon.className = "effect-tile-icon";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "effect-tile-name";
+        nameSpan.textContent = model.name;
+
+        tile.append(icon, nameSpan);
+
+        if (model.minFw) {
+          const badge = document.createElement("span");
+          badge.className = "effect-tile-badge";
+          badge.textContent = `V${model.minFw}+`;
+          tile.appendChild(badge);
+        }
+
+        tile.addEventListener("click", () => {
+          app.selectedBlockId = cat.blockId;
+          void handleChangeModel(cat.blockId, model.id);
+          renderEffectsLibrary();
+        });
+
+        grid.appendChild(tile);
+      });
+
+      catEl.append(header, grid);
+      container.appendChild(catEl);
+    });
+  }
+
   function renderAll() {
     renderPorts();
     renderTopBar();
@@ -2524,6 +2677,19 @@
     });
 
     // Modal close handlers
+    if (els["btn-toggle-presets"]) {
+      els["btn-toggle-presets"].addEventListener("click", () => togglePresetsDrawer());
+    }
+    if (els["btn-toggle-effects"]) {
+      els["btn-toggle-effects"].addEventListener("click", () => toggleEffectsDrawer());
+    }
+    if (els["btn-close-effects"]) {
+      els["btn-close-effects"].addEventListener("click", () => toggleEffectsDrawer(false));
+    }
+    if (els["effects-search"]) {
+      els["effects-search"].addEventListener("input", () => renderEffectsLibrary());
+    }
+
     document.querySelectorAll("[data-close-modal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         closeModal(btn.getAttribute("data-close-modal"));
@@ -2537,10 +2703,25 @@
       });
     });
     document.addEventListener("keydown", (ev) => {
+      if (ev.target instanceof Element && ev.target.closest("input, select, textarea")) {
+        if (ev.key === "Escape") {
+          ev.target.blur();
+        }
+        return;
+      }
       if (ev.key === "Escape") {
         ["modal-save", "modal-revert", "modal-backup"].forEach((id) => {
           if (!els[id].hidden) closeModal(id);
         });
+        if (els["effects-drawer"] && !els["effects-drawer"].hidden) {
+          toggleEffectsDrawer(false);
+        }
+      } else if (ev.key === "p" || ev.key === "P") {
+        ev.preventDefault();
+        togglePresetsDrawer();
+      } else if (ev.key === "e" || ev.key === "E") {
+        ev.preventDefault();
+        toggleEffectsDrawer();
       }
     });
   }
