@@ -1390,6 +1390,24 @@
     }
   }
 
+  function getPedalThemeClass(block) {
+    const name = (block.model_name || "").toLowerCase();
+    const bId = block.block_id;
+    if (bId === 0) {
+      if (name.includes("compress")) return "pedal-theme-silver-squeeze";
+      if (name.includes("boost") || name.includes("drive")) return "pedal-theme-blues-racer";
+      return "pedal-theme-smart-signal";
+    }
+    if (bId === 2) {
+      if (name.includes("phase")) return "pedal-theme-phase-91";
+      if (name.includes("flang")) return "pedal-theme-lightning-mistress";
+      return "pedal-theme-double-vision";
+    }
+    if (bId === 3) return "pedal-theme-digital-echo";
+    if (bId === 4) return "pedal-theme-reverb";
+    return "";
+  }
+
   function buildPedalSvg(block) {
     const spec = BLOCK_CATALOG[block.block_id];
     const tplId =
@@ -1397,11 +1415,23 @@
         ? "tpl-pedal-amp"
         : block.block_id === 5
           ? "tpl-pedal-cab"
-          : "tpl-pedal-stomp";
+          : els["tpl-pedal-skeuo"]
+            ? "tpl-pedal-skeuo"
+            : "tpl-pedal-stomp";
     const tpl = els[tplId];
     const svg = tpl.content.firstElementChild.cloneNode(true);
     const ns = svg.namespaceURI;
     const knobsLayer = svg.querySelector(".svg-knobs-layer");
+
+    const themeClass = getPedalThemeClass(block);
+    if (themeClass) {
+      svg.classList.add(themeClass);
+    }
+
+    const titleEl = svg.querySelector(".svg-pedal-title");
+    if (titleEl) {
+      titleEl.textContent = block.model_name || spec?.name || "";
+    }
 
     if (knobsLayer && block.block_id !== 5) {
       const knobs = block.knobs || [];
@@ -1411,6 +1441,30 @@
           const cy = 29;
           appendMiniKnobSvg(knobsLayer, ns, cx, cy, 6.2, knob.slot, knob.raw);
         });
+      } else if (tplId === "tpl-pedal-skeuo") {
+        const count = knobs.length;
+        if (count === 1) {
+          appendMiniKnobSvg(knobsLayer, ns, 65, 72, 13, knobs[0].slot, knobs[0].raw);
+        } else if (count === 2) {
+          appendMiniKnobSvg(knobsLayer, ns, 44, 72, 11, knobs[0].slot, knobs[0].raw);
+          appendMiniKnobSvg(knobsLayer, ns, 86, 72, 11, knobs[1].slot, knobs[1].raw);
+        } else if (count === 3) {
+          appendMiniKnobSvg(knobsLayer, ns, 34, 72, 9.5, knobs[0].slot, knobs[0].raw);
+          appendMiniKnobSvg(knobsLayer, ns, 65, 72, 9.5, knobs[1].slot, knobs[1].raw);
+          appendMiniKnobSvg(knobsLayer, ns, 96, 72, 9.5, knobs[2].slot, knobs[2].raw);
+        } else {
+          const topCount = count <= 4 ? 2 : 3;
+          knobs.forEach((knob, idx) => {
+            const isSecondRow = idx >= topCount;
+            const rowIndex = isSecondRow ? idx - topCount : idx;
+            const rowTotal = isSecondRow ? count - topCount : topCount;
+            const spacing = rowTotal === 1 ? 0 : rowTotal === 2 ? 40 : 31;
+            const startX = 65 - ((rowTotal - 1) * spacing) / 2;
+            const cx = startX + rowIndex * spacing;
+            const cy = isSecondRow ? 91 : 57;
+            appendMiniKnobSvg(knobsLayer, ns, cx, cy, 8.2, knob.slot, knob.raw);
+          });
+        }
       } else {
         const count = knobs.length;
         const topCount = count <= 3 ? count : Math.ceil(count / 2);

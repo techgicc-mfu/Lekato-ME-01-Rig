@@ -209,6 +209,41 @@ class UIAssetsTests(unittest.TestCase):
         self.assertIn("app.knobQueue.get(addr) !== entry", js_text)
         self.assertIn('event.target.value = ""', js_text)
 
+    def test_skeuomorphic_pedal_templates_and_themes(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. Template exists in index.html
+        self.assertIn('id="tpl-pedal-skeuo"', html_text)
+
+        # 2. Required SVG elements in template
+        for el in (
+            "svg-chassis-bevel",
+            "svg-chassis-screw",
+            "svg-jack-left",
+            "svg-jack-right",
+            "svg-switch-ring",
+            "svg-switch-plunger",
+            "svg-led-jewel",
+        ):
+            self.assertIn(el, html_text, f"Missing SVG template element: {el}")
+
+        # 3. CSS theme classes in styles.css
+        for theme in (
+            "pedal-theme-smart-signal",
+            "pedal-theme-silver-squeeze",
+            "pedal-theme-blues-racer",
+            "pedal-theme-phase-91",
+            "pedal-theme-double-vision",
+            "pedal-theme-lightning-mistress",
+            "pedal-theme-digital-echo",
+        ):
+            self.assertIn(theme, css_text, f"Missing CSS theme class: {theme}")
+
+        # 4. app.js references tpl-pedal-skeuo
+        self.assertIn("tpl-pedal-skeuo", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()

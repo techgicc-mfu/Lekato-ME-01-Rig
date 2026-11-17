@@ -971,6 +971,162 @@ body {
   fill: #9ca3af;
 }
 
+/* ==========================================================================
+   UltraRig Skeuomorphic Stompbox Styles & Theme Engine
+   ========================================================================== */
+
+.pedal-svg-skeuo {
+  width: 120px;
+  height: 175px;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.65));
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.pedal-card:hover .pedal-svg-skeuo {
+  transform: translateY(-3px) scale(1.02);
+  filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.75));
+}
+
+.svg-chassis-shadow {
+  fill: rgba(0, 0, 0, 0.45);
+}
+
+.svg-chassis-bevel {
+  fill: #334155;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.svg-chassis-body {
+  fill: var(--pedal-chassis-fill, #1e293b);
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 1.5;
+}
+
+.svg-chassis-screw {
+  fill: url(#screw-metal-grad);
+  stroke: #1e293b;
+  stroke-width: 0.6;
+}
+
+.svg-jack-left,
+.svg-jack-right {
+  fill: #64748b;
+  stroke: #0f172a;
+  stroke-width: 0.8;
+}
+
+.svg-pedal-title {
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  fill: var(--pedal-title-color, #f8fafc);
+  text-transform: uppercase;
+}
+
+/* Footswitch hardware */
+.svg-switch-ring {
+  fill: #475569;
+  stroke: #0f172a;
+  stroke-width: 1.2;
+}
+
+.svg-switch-nut {
+  fill: url(#switch-chrome-grad);
+  stroke: #334155;
+  stroke-width: 0.8;
+}
+
+.svg-switch-plunger {
+  fill: #94a3b8;
+  stroke: #1e293b;
+  stroke-width: 0.8;
+  transition: transform 90ms ease, fill 90ms ease;
+}
+
+.pedal-card:active .svg-switch-plunger {
+  transform: scale(0.92);
+  fill: #64748b;
+}
+
+/* LED Jewel */
+.svg-led-jewel {
+  fill: #334155;
+  stroke: #0f172a;
+  stroke-width: 0.6;
+  transition: fill 150ms ease;
+}
+
+.svg-led-halo {
+  fill: var(--pedal-led-color, #ef4444);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.pedal-card:not(.is-bypassed) .svg-led-jewel {
+  fill: var(--pedal-led-color, #ef4444);
+  filter: drop-shadow(0 0 5px var(--pedal-led-color, #ef4444));
+}
+
+.pedal-card:not(.is-bypassed) .svg-led-halo {
+  opacity: 0.85;
+}
+
+/* --------------------------------------------------------------------------
+   Model-Specific Skeuomorphic Themes
+   -------------------------------------------------------------------------- */
+
+/* 1. Smart Signal (Noise Gate) */
+.pedal-theme-smart-signal .svg-chassis-bevel { fill: #064e3b; }
+.pedal-theme-smart-signal .svg-chassis-body { fill: #065f46; }
+.pedal-theme-smart-signal .svg-faceplate { fill: #042f2e; stroke: #34d399; stroke-width: 0.8; }
+.pedal-theme-smart-signal { --pedal-led-color: #ef4444; --pedal-title-color: #a7f3d0; }
+
+/* 2. Silver Squeeze (Compressor) */
+.pedal-theme-silver-squeeze .svg-chassis-bevel { fill: #94a3b8; }
+.pedal-theme-silver-squeeze .svg-chassis-body { fill: #cbd5e1; }
+.pedal-theme-silver-squeeze .svg-faceplate { fill: #e2e8f0; stroke: #475569; stroke-width: 0.8; }
+.pedal-theme-silver-squeeze { --pedal-led-color: #ef4444; --pedal-title-color: #0f172a; }
+
+/* 3. Blues Racer (Boost / Overdrive) */
+.pedal-theme-blues-racer .svg-chassis-bevel { fill: #1e3a8a; }
+.pedal-theme-blues-racer .svg-chassis-body { fill: #1d4ed8; }
+.pedal-theme-blues-racer .svg-faceplate { fill: #172554; stroke: #60a5fa; stroke-width: 0.8; }
+.pedal-theme-blues-racer { --pedal-led-color: #f59e0b; --pedal-title-color: #bfdbfe; }
+
+/* 4. Phase 91 (Phaser) */
+.pedal-theme-phase-91 .svg-chassis-bevel { fill: #9a3412; }
+.pedal-theme-phase-91 .svg-chassis-body { fill: #ea580c; }
+.pedal-theme-phase-91 .svg-faceplate { fill: #7c2d12; stroke: #fdba74; stroke-width: 0.8; }
+.pedal-theme-phase-91 { --pedal-led-color: #ef4444; --pedal-title-color: #ffedd5; }
+
+/* 5. Double Vision (Chorus) */
+.pedal-theme-double-vision .svg-chassis-bevel { fill: #581c87; }
+.pedal-theme-double-vision .svg-chassis-body { fill: #7e22ce; }
+.pedal-theme-double-vision .svg-faceplate { fill: #3b0764; stroke: #c084fc; stroke-width: 0.8; }
+.pedal-theme-double-vision { --pedal-led-color: #00e5ff; --pedal-title-color: #f3e8ff; }
+
+/* 6. Lightning Mistress (Flanger) */
+.pedal-theme-lightning-mistress .svg-chassis-bevel { fill: #3f6212; }
+.pedal-theme-lightning-mistress .svg-chassis-body { fill: #65a30d; }
+.pedal-theme-lightning-mistress .svg-faceplate { fill: #1a2e05; stroke: #bef264; stroke-width: 0.8; }
+.pedal-theme-lightning-mistress { --pedal-led-color: #a3e635; --pedal-title-color: #ecfccb; }
+
+/* 7. Digital Echo (Delay) */
+.pedal-theme-digital-echo .svg-chassis-bevel { fill: #0f172a; }
+.pedal-theme-digital-echo .svg-chassis-body { fill: #1e293b; }
+.pedal-theme-digital-echo .svg-faceplate { fill: #090d16; stroke: #38bdf8; stroke-width: 0.8; }
+.pedal-theme-digital-echo { --pedal-led-color: #38bdf8; --pedal-title-color: #e0f2fe; }
+
+/* Generic Category Theme fallbacks */
+.pedal-theme-gate .svg-chassis-body { fill: #065f46; }
+.pedal-theme-compressor .svg-chassis-body { fill: #cbd5e1; }
+.pedal-theme-drive .svg-chassis-body { fill: #b45309; }
+.pedal-theme-mod .svg-chassis-body { fill: #6d28d9; }
+.pedal-theme-delay .svg-chassis-body { fill: #0369a1; }
+.pedal-theme-reverb .svg-chassis-body { fill: #0f766e; }
+
 /* AMP head SVG colors */
 .svg-amp-cabinet {
   fill: #2d2219;
