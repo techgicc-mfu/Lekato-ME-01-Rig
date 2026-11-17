@@ -1504,6 +1504,123 @@ body {
   border-radius: 6px;
 }
 
+/* --------------------------------------------------------------------------
+   Section Navigation Tabs & Top Signal Flow Minimap
+   -------------------------------------------------------------------------- */
+
+.signal-flow-minimap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 14px;
+  background: rgba(16, 18, 22, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: fit-content;
+  margin: 2px auto 10px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.minimap-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.minimap-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #1a1e24;
+  border: 1px solid #2d333e;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+  user-select: none;
+}
+
+.minimap-chip:hover {
+  border-color: var(--accent-cyan);
+  background: #232932;
+  transform: translateY(-1px);
+}
+
+.minimap-chip.is-selected {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.15);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
+}
+
+.minimap-chip.is-bypassed {
+  opacity: 0.52;
+}
+
+.minimap-led {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 5px rgba(34, 197, 94, 0.8);
+}
+
+.minimap-chip.is-bypassed .minimap-led {
+  background: #64748b;
+  box-shadow: none;
+}
+
+.minimap-arrow {
+  color: #475569;
+  font-size: 10px;
+  user-select: none;
+}
+
+.section-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 auto 12px;
+}
+
+.section-tab {
+  padding: 5px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #14171c;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms ease;
+  user-select: none;
+}
+
+.section-tab:hover {
+  border-color: var(--border-bright);
+  color: var(--text-primary);
+  background: #1c2026;
+}
+
+.section-tab.is-active {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.14);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.22);
+}
+
 /* AMP head SVG colors */
 .svg-amp-cabinet {
   fill: #2d2219;

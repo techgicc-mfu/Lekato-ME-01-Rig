@@ -84,6 +84,7 @@
     ports: [],
     presetsCache: [],
     selectedBlockId: 0,
+    currentTab: "pedalera",
     bankFilter: "all",
     searchTerm: "",
     factoryUnlocked: false,
@@ -143,6 +144,12 @@
       "patch-cables-svg",
       "knob-floating-tooltip",
       "pedal-cards-row",
+      "signal-flow-minimap",
+      "section-tabs",
+      "tab-pedalera",
+      "tab-pedales",
+      "tab-amp",
+      "tab-post-amp",
       "amp-stage-view",
       "amp-model-badge",
       "amp-badge-text",
@@ -1676,7 +1683,103 @@
     layer.append(circle, pointer);
   }
 
+  function setSectionTab(tabId) {
+    app.currentTab = tabId;
+    ["pedalera", "pedales", "amp", "post-amp"].forEach((id) => {
+      const btn = els[`tab-${id}`];
+      if (btn) {
+        const active = id === tabId;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-selected", String(active));
+      }
+    });
+
+    const isAmpView = tabId === "amp";
+    const boardPanel = document.querySelector(".pedalboard-panel");
+    if (boardPanel) {
+      boardPanel.hidden = isAmpView;
+    }
+    if (els["amp-stage-view"]) {
+      els["amp-stage-view"].hidden = !isAmpView;
+    }
+
+    if (isAmpView) {
+      renderAmpStage();
+    } else {
+      renderPedalboard();
+    }
+    renderSignalFlowMinimap();
+  }
+
+  function renderSignalFlowMinimap() {
+    const minimap = els["signal-flow-minimap"];
+    if (!minimap) return;
+    minimap.replaceChildren();
+
+    const ram = app.state?.ram;
+    if (!ram || !Array.isArray(ram.order)) return;
+
+    const inNode = document.createElement("span");
+    inNode.className = "minimap-node";
+    inNode.textContent = "IN";
+    minimap.appendChild(inNode);
+
+    const arrow1 = document.createElement("span");
+    arrow1.className = "minimap-arrow";
+    arrow1.textContent = "→";
+    minimap.appendChild(arrow1);
+
+    ram.order.forEach((blockId, idx) => {
+      const block = getBlockById(ram, blockId);
+      const spec = BLOCK_CATALOG[blockId];
+      if (!block || !spec) return;
+
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = `minimap-chip${blockId === app.selectedBlockId ? " is-selected" : ""}${block.enabled ? "" : " is-bypassed"}`;
+      chip.setAttribute("data-block-id", String(blockId));
+      chip.setAttribute("aria-label", `${block.name} ${block.model_name}`);
+
+      const led = document.createElement("span");
+      led.className = "minimap-led";
+
+      const txt = document.createElement("span");
+      txt.textContent = `${block.name}: ${block.model_name}`;
+
+      chip.append(led, txt);
+
+      chip.addEventListener("click", () => {
+        app.selectedBlockId = blockId;
+        if (app.currentTab === "amp" && blockId !== 1 && blockId !== 5) {
+          setSectionTab("pedalera");
+        } else if (app.currentTab === "pedales") {
+          const ampIdx = ram.order.indexOf(1);
+          if (idx >= ampIdx) setSectionTab("pedalera");
+        } else if (app.currentTab === "post-amp") {
+          const ampIdx = ram.order.indexOf(1);
+          if (idx <= ampIdx) setSectionTab("pedalera");
+        }
+        renderPedalboard();
+        renderInspector();
+        renderSignalFlowMinimap();
+      });
+
+      minimap.appendChild(chip);
+
+      const arrow = document.createElement("span");
+      arrow.className = "minimap-arrow";
+      arrow.textContent = "→";
+      minimap.appendChild(arrow);
+    });
+
+    const outNode = document.createElement("span");
+    outNode.className = "minimap-node";
+    outNode.textContent = "OUT";
+    minimap.appendChild(outNode);
+  }
+
   function renderPedalboard() {
+    renderSignalFlowMinimap();
     const ram = app.state?.ram;
     const hasRam = Boolean(ram && Array.isArray(ram.order));
     els["pedalboard-empty"].hidden = hasRam;
@@ -1703,7 +1806,10 @@
       activeEl instanceof Element && row.contains(activeEl) && activeEl.classList.contains("pedal-footswitch");
     row.replaceChildren();
 
+    const ampIdx = ram.order.indexOf(1);
     ram.order.forEach((blockId, chainIdx) => {
+      if (app.currentTab === "pedales" && chainIdx >= ampIdx) return;
+      if (app.currentTab === "post-amp" && chainIdx <= ampIdx) return;
       const block = getBlockById(ram, blockId);
       const spec = BLOCK_CATALOG[blockId];
       if (!block || !spec) return;
@@ -2196,6 +2302,14 @@
   }
 
   function bindEvents() {
+    ["pedalera", "pedales", "amp", "post-amp"].forEach((tabId) => {
+      const btn = els[`tab-${tabId}`];
+      if (btn) {
+        btn.addEventListener("click", () => {
+          setSectionTab(tabId);
+        });
+      }
+    });
     if (els["amp-power-toggle"]) {
       els["amp-power-toggle"].addEventListener("click", () => {
         const ampBlock = getBlockById(app.state?.ram, 1);

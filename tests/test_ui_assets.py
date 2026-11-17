@@ -332,6 +332,33 @@ class UIAssetsTests(unittest.TestCase):
         self.assertNotIn("amp-standby", html_text.lower())
         self.assertNotIn("amp-presence", html_text.lower())
 
+    def test_section_tabs_and_signal_flow_minimap(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #section-tabs and tab buttons in index.html
+        self.assertIn('id="section-tabs"', html_text)
+        for tab_id in ("tab-pedalera", "tab-pedales", "tab-amp", "tab-post-amp"):
+            self.assertIn(tab_id, html_text, f"Missing section tab: {tab_id}")
+
+        # 2. #signal-flow-minimap in index.html
+        self.assertIn('id="signal-flow-minimap"', html_text)
+
+        # 3. CSS classes in styles.css
+        for cls in (
+            "section-tabs",
+            "section-tab",
+            "signal-flow-minimap",
+            "minimap-node",
+            "minimap-chip",
+        ):
+            self.assertIn(cls, css_text, f"Missing minimap CSS class: {cls}")
+
+        # 4. setSectionTab and dynamic filtering in app.js
+        self.assertIn("setSectionTab", js_text)
+        self.assertIn("renderSignalFlowMinimap", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()
