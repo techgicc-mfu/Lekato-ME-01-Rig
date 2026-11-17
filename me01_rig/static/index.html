@@ -13,6 +13,10 @@
       <div class="topbar-left">
         <div class="brand-mark" aria-label="ME-01 RIG">
           <span class="brand-main">ME-01</span><span class="brand-accent">RIG</span>
+          <div class="annlab-brand-tag" title="ME-01 Rig Studio">
+            <span class="annlab-brand-title">ME-01 Rig</span>
+            <span class="annlab-brand-subtitle">Pedalboard Editor · Lekato ME-01</span>
+          </div>
         </div>
 
         <div id="conn-pill" class="conn-pill is-disconnected" role="status">
@@ -30,6 +34,10 @@
           <button id="btn-demo" type="button" class="btn btn-ghost btn-sm">Demo</button>
           <button id="btn-disconnect" type="button" class="btn btn-ghost btn-sm" hidden>Disconnect</button>
         </div>
+      </div>
+
+      <div id="annlab-preset-capsule" class="annlab-preset-capsule" title="Current Active Preset">
+        <span id="annlab-preset-title" class="annlab-preset-title">01. UWE-Twins</span>
       </div>
 
       <div class="topbar-right">
@@ -55,6 +63,9 @@
           <button id="btn-open-capture-mgr" type="button" class="btn btn-secondary btn-sm" title="Capture &amp; IR Manager (C)">Captures &amp; IRs (C)</button>
           <button id="btn-toggle-effects" type="button" class="btn btn-secondary btn-sm" title="Toggle Effects Library (E)">Effects (E)</button>
           <button id="btn-save-slot" type="button" class="btn btn-primary btn-sm" disabled>Save to Slot</button>
+          <button id="btn-annlab-bypass" type="button" class="btn btn-ghost btn-sm annlab-header-btn" title="Toggle Bypass">BY PASS</button>
+          <button id="btn-toggle-large" type="button" class="btn btn-ghost btn-sm annlab-header-btn" title="Toggle Large Studio Mode">&lt;LARGE&gt;</button>
+          <button id="btn-toggle-view" type="button" class="btn btn-secondary btn-sm annlab-header-btn" title="Toggle between Studio View and Pedalboard View">Studio View</button>
         </div>
       </div>
     </header>
@@ -108,6 +119,30 @@
           <button id="tab-amp" type="button" class="section-tab" data-tab="amp" role="tab" aria-selected="false">Amp</button>
           <button id="tab-post-amp" type="button" class="section-tab" data-tab="post-amp" role="tab" aria-selected="false">Post-amp</button>
         </div>
+
+        <!-- AnnLab Photorealistic Gear Stage -->
+        <section id="annlab-stage-view" class="annlab-stage-view" aria-label="AnnLab Photorealistic Gear Stage">
+          <div class="annlab-gear-frame">
+            <div id="annlab-chassis" class="annlab-chassis">
+              <img id="annlab-chassis-img" class="annlab-chassis-img" src="annlab/amp_background.png" alt="Selected Equipment Chassis">
+              <div id="annlab-pilot-lamp" class="annlab-pilot-lamp is-on" title="Power / Bypass Indicator"></div>
+              <div id="annlab-pedal-knobs-panel" class="annlab-pedal-knobs-panel" hidden>
+                <div id="annlab-knobs-panel-title" class="annlab-knobs-panel-title">FX · COMPRESS</div>
+              </div>
+              <div id="annlab-knobs-layer" class="annlab-knobs-layer"></div>
+            </div>
+            <div class="annlab-gear-footer">
+              <button id="btn-annlab-import" type="button" class="btn btn-secondary btn-sm annlab-import-btn" title="Import Capture / IR">Import</button>
+              <div class="annlab-model-selector-wrap">
+                <select id="annlab-model-select" class="select-input annlab-model-select" aria-label="Select Model"></select>
+              </div>
+              <div class="annlab-block-actions">
+                <span id="annlab-block-name" class="annlab-block-tag">AMP</span>
+                <button id="btn-annlab-block-bypass" type="button" class="annlab-bypass-btn is-on">ACTIVE</button>
+              </div>
+            </div>
+          </div>
+        </section>
 
         <section class="panel pedalboard-panel" aria-label="Signal Chain Pedalboard">
           <div class="panel-header-row">

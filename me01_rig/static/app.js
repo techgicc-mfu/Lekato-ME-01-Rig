@@ -110,6 +110,8 @@
     captureSearch: "",
     captureRenamingSlot: null,
     curatedLibrary: null,
+    viewMode: "annlab",
+    annlabKnobsByAddr: new Map(),
   };
 
   const els = {};
@@ -133,6 +135,22 @@
       "btn-revert",
       "btn-backup",
       "btn-save-slot",
+      "annlab-preset-capsule",
+      "annlab-preset-title",
+      "btn-annlab-bypass",
+      "btn-toggle-large",
+      "btn-toggle-view",
+      "annlab-stage-view",
+      "annlab-chassis",
+      "annlab-chassis-img",
+      "annlab-pilot-lamp",
+      "annlab-knobs-layer",
+      "btn-annlab-import",
+      "annlab-model-select",
+      "annlab-block-name",
+      "btn-annlab-block-bypass",
+      "annlab-pedal-knobs-panel",
+      "annlab-knobs-panel-title",
       "error-banner",
       "error-banner-text",
       "btn-dismiss-error",
@@ -451,6 +469,9 @@
         refs.numberInput.value = String(val);
       }
       refs.unitDisplay.textContent = formatKnobDisplay(refs.blockId, refs.modelId, refs.slot, val);
+      if (refs.updateRotaryKnob) {
+        refs.updateRotaryKnob(val, refs.unitDisplay.textContent);
+      }
       refs.rawBadge.textContent = `0x${addr.toString(16).padStart(2, "0")} · raw ${val}`;
 
       // Update mini SVG knob indicator on pedal card
@@ -468,6 +489,11 @@
       if (refs.blockId === 3 && refs.slot === 0) {
         updateDelayTempoReadout(val, refs.modelId);
       }
+    }
+
+    const annlabKnob = app.annlabKnobsByAddr.get(addr);
+    if (annlabKnob) {
+      annlabKnob.update(val);
     }
   }
 
@@ -2499,6 +2525,204 @@
     }
   }
 
+  function createUltraRigKnob({
+    min = 0,
+    max = 100,
+    val = 50,
+    label = "",
+    displayValue = "",
+    color = "var(--accent-gold, #f0cf8a)",
+    onChange,
+    onStartDrag,
+    onEndDrag,
+  }) {
+    const el = document.createElement("div");
+    el.className = "ultrarig-rotary-knob knob";
+    el.setAttribute("role", "slider");
+    el.tabIndex = 0;
+    el.setAttribute("aria-label", label);
+    el.setAttribute("aria-valuemin", String(min));
+    el.setAttribute("aria-valuemax", String(max));
+    el.setAttribute("aria-valuenow", String(val));
+    el.setAttribute("aria-valuetext", displayValue || String(val));
+
+    const svgNs = els["patch-cables-svg"] ? els["patch-cables-svg"].namespaceURI : null;
+    const svg = svgNs ? document.createElementNS(svgNs, "svg") : document.createElement("svg");
+    const ns = svg.namespaceURI;
+    svg.setAttribute("viewBox", "0 0 80 80");
+    svg.setAttribute("aria-hidden", "true");
+
+    const A0 = -135;
+    const A1 = 135;
+    const R = 30.4;
+    const pt = (a) => {
+      const r = ((a - 90) * Math.PI) / 180;
+      return [40 + R * Math.cos(r), 40 + R * Math.sin(r)];
+    };
+    const pathArc = (a, b) => {
+      const [x0, y0] = pt(a);
+      const [x1, y1] = pt(b);
+      return `M ${x0.toFixed(2)} ${y0.toFixed(2)} A ${R} ${R} 0 ${b - a > 180 ? 1 : 0} 1 ${x1.toFixed(2)} ${y1.toFixed(2)}`;
+    };
+
+    const trk = document.createElementNS(ns, "path");
+    trk.setAttribute("class", "trk");
+    trk.setAttribute("fill", "none");
+    trk.setAttribute("stroke", "#3e4b52");
+    trk.setAttribute("stroke-width", "5.6");
+    trk.setAttribute("stroke-linecap", "round");
+    trk.setAttribute("d", pathArc(A0, A1));
+
+    const arc = document.createElementNS(ns, "path");
+    arc.setAttribute("class", "arc");
+    arc.setAttribute("fill", "none");
+    arc.setAttribute("stroke", color);
+    arc.setAttribute("stroke-width", "5.6");
+    arc.setAttribute("stroke-linecap", "round");
+
+    const shadow = document.createElementNS(ns, "circle");
+    shadow.setAttribute("cx", "40");
+    shadow.setAttribute("cy", "42");
+    shadow.setAttribute("r", "21.6");
+    shadow.setAttribute("fill", "#000");
+    shadow.setAttribute("opacity", "0.35");
+
+    const knb = document.createElementNS(ns, "circle");
+    knb.setAttribute("class", "knb");
+    knb.setAttribute("cx", "40");
+    knb.setAttribute("cy", "40");
+    knb.setAttribute("r", "21.6");
+    knb.setAttribute("fill", "#2c353b");
+    knb.setAttribute("stroke", "#6b7a82");
+    knb.setAttribute("stroke-width", "1.6");
+
+    const ptr = document.createElementNS(ns, "line");
+    ptr.setAttribute("class", "ptr");
+    ptr.setAttribute("x1", "40");
+    ptr.setAttribute("y1", "40");
+    ptr.setAttribute("x2", "40");
+    ptr.setAttribute("y2", "24");
+    ptr.setAttribute("stroke", "#ffffff");
+    ptr.setAttribute("stroke-width", "3.2");
+    ptr.setAttribute("stroke-linecap", "round");
+
+    svg.append(trk, arc, shadow, knb, ptr);
+
+    const valEl = document.createElement("div");
+    valEl.className = "v";
+    valEl.textContent = displayValue || String(val);
+
+    const nameEl = document.createElement("div");
+    nameEl.className = "n";
+    nameEl.textContent = label;
+
+    el.append(svg, valEl, nameEl);
+
+    let currentVal = val;
+
+    const draw = (v, formatted) => {
+      currentVal = v;
+      const f = (v - min) / (max - min);
+      const a = A0 + f * (A1 - A0);
+      arc.setAttribute("d", Math.abs(a - A0) < 0.5 ? "" : pathArc(A0, a));
+      ptr.setAttribute("transform", `rotate(${a.toFixed(1)} 40 40)`);
+      if (formatted !== undefined) {
+        valEl.textContent = formatted;
+      }
+      el.setAttribute("aria-valuenow", String(v));
+      el.setAttribute("aria-valuetext", valEl.textContent);
+    };
+
+    draw(val, displayValue);
+
+    let startY = 0;
+    let startVal = 0;
+    let isDragging = false;
+
+    svg.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      svg.setPointerCapture(e.pointerId);
+      startY = e.clientY;
+      startVal = currentVal;
+      isDragging = true;
+      if (typeof onStartDrag === "function") onStartDrag();
+    });
+
+    svg.addEventListener("pointermove", (e) => {
+      if (!isDragging) return;
+      const deltaY = startY - e.clientY;
+      const speed = e.shiftKey ? 0.25 : 0.65;
+      const span = max - min;
+      const stepVal = (deltaY * speed * span) / 100;
+      const nextVal = clampInt(Math.round(startVal + stepVal), min, max);
+      if (nextVal !== currentVal) {
+        if (typeof onChange === "function") onChange(nextVal);
+      }
+    });
+
+    const endPointer = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        if (svg.hasPointerCapture(e.pointerId)) {
+          svg.releasePointerCapture(e.pointerId);
+        }
+      } catch (_) {}
+      if (typeof onEndDrag === "function") onEndDrag();
+    };
+
+    svg.addEventListener("pointerup", endPointer);
+    svg.addEventListener("pointercancel", endPointer);
+
+    svg.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const step = e.deltaY < 0 ? 1 : -1;
+      const nextVal = clampInt(currentVal + step, min, max);
+      if (nextVal !== currentVal && typeof onChange === "function") {
+        onChange(nextVal);
+      }
+    });
+
+    svg.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      if (typeof onChange === "function") {
+        onChange(50);
+      }
+    });
+
+    el.addEventListener("keydown", (e) => {
+      const step = e.shiftKey ? 5 : 1;
+      let nextVal = currentVal;
+      if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+        nextVal = clampInt(currentVal + step, min, max);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+        nextVal = clampInt(currentVal - step, min, max);
+      } else if (e.key === "PageUp") {
+        nextVal = clampInt(currentVal + 10, min, max);
+      } else if (e.key === "PageDown") {
+        nextVal = clampInt(currentVal - 10, min, max);
+      } else if (e.key === "Home") {
+        nextVal = min;
+      } else if (e.key === "End") {
+        nextVal = max;
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        nextVal = 50;
+      } else {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      if (nextVal !== currentVal && typeof onChange === "function") {
+        onChange(nextVal);
+      }
+    });
+
+    return {
+      el,
+      update: draw,
+    };
+  }
+
   function renderInspectorSubtitle() {
     const ram = app.state?.ram;
     const block = getBlockById(ram, app.selectedBlockId);
@@ -2642,16 +2866,6 @@
       }
       foot.append(rawBadge, hintSpan);
 
-      app.knobInputsByAddr.set(knob.addr, {
-        blockId: block.block_id,
-        modelId: block.model_id,
-        slot: knob.slot,
-        slider,
-        numberInput,
-        unitDisplay,
-        rawBadge,
-      });
-
       const startDrag = () => {
         app.activeDragAddr = knob.addr;
         markLocalEdit();
@@ -2662,6 +2876,33 @@
         }
         markLocalEdit();
       };
+
+      const rotary = createUltraRigKnob({
+        min: 0,
+        max: 100,
+        val: knob.raw,
+        label: knob.label,
+        displayValue: formatKnobDisplay(block.block_id, block.model_id, knob.slot, knob.raw),
+        color: spec.colorVar || 'var(--accent-gold, #f0cf8a)',
+        onChange: (newVal) => {
+          updateKnobVisualsInPlace(knob.addr, newVal, { fromLocal: true });
+          queueKnobChange(knob.addr, newVal);
+        },
+        onStartDrag: startDrag,
+        onEndDrag: endDrag,
+      });
+
+      app.knobInputsByAddr.set(knob.addr, {
+        blockId: block.block_id,
+        modelId: block.model_id,
+        slot: knob.slot,
+        slider,
+        numberInput,
+        unitDisplay,
+        rawBadge,
+        rotaryEl: rotary.el,
+        updateRotaryKnob: rotary.update,
+      });
 
       slider.addEventListener("pointerdown", startDrag);
       slider.addEventListener("mousedown", startDrag);
@@ -2690,9 +2931,366 @@
       });
 
       row.append(slider, numberInput);
-      card.append(head, row, foot);
+      card.append(rotary.el, head, row, foot);
       knobsContainer.appendChild(card);
     }
+  }
+
+  function renderAnnLabPresetCapsule() {
+    if (!els["annlab-preset-title"]) return;
+    const ram = app.state?.ram;
+    const slot = app.state?.active_slot ?? 0;
+    const slotName = ram?.name || `Slot P${String(slot + 1).padStart(2, "0")}`;
+    const slotPfx = String(slot + 1).padStart(2, "0");
+    els["annlab-preset-title"].textContent = `${slotPfx}.${slotName}`;
+  }
+
+  function setViewMode(mode) {
+    const isAnnLab = mode === "annlab";
+    app.viewMode = isAnnLab ? "annlab" : "pedalboard";
+    document.body.classList.toggle("view-annlab", isAnnLab);
+    try {
+      localStorage.setItem("me01_view_mode", app.viewMode);
+    } catch (_) {}
+    if (els["btn-toggle-view"]) {
+      els["btn-toggle-view"].textContent = isAnnLab ? "Pedalboard View" : "Studio View";
+      els["btn-toggle-view"].classList.toggle("is-active", isAnnLab);
+    }
+    renderAnnLabPresetCapsule();
+    renderAnnLabStage();
+    window.requestAnimationFrame(() => renderPatchCables());
+  }
+
+  function toggleLargeMode(forceState) {
+    const willBeLarge = typeof forceState === "boolean" ? forceState : !document.body.classList.contains("mode-large");
+    document.body.classList.toggle("mode-large", willBeLarge);
+    try {
+      localStorage.setItem("me01_large_mode", willBeLarge ? "true" : "false");
+    } catch (_) {}
+    if (els["btn-toggle-large"]) {
+      els["btn-toggle-large"].classList.toggle("is-active", willBeLarge);
+    }
+    window.requestAnimationFrame(() => renderPatchCables());
+  }
+
+  function initAnnLabView() {
+    let savedMode = "annlab";
+    try {
+      savedMode = localStorage.getItem("me01_view_mode") || "annlab";
+    } catch (_) {}
+    let isLarge = false;
+    try {
+      isLarge = localStorage.getItem("me01_large_mode") === "true";
+    } catch (_) {}
+    setViewMode(savedMode);
+    if (isLarge) toggleLargeMode(true);
+  }
+
+  function createAnnLabKnob({ knob, block, spec, posX, posY }) {
+    const wrapper = document.createElement("div");
+    wrapper.className = "annlab-knob-wrapper";
+    wrapper.style.left = `${posX}%`;
+    wrapper.style.top = `${posY}%`;
+    wrapper.setAttribute("role", "slider");
+    wrapper.setAttribute("tabindex", "0");
+    wrapper.setAttribute("aria-label", knob.label);
+    wrapper.setAttribute("aria-valuemin", "0");
+    wrapper.setAttribute("aria-valuemax", "100");
+    wrapper.setAttribute("aria-valuenow", String(knob.raw));
+
+    const dial = document.createElement("div");
+    dial.className = "annlab-knob-dial";
+
+    const svgNs = els["patch-cables-svg"] ? els["patch-cables-svg"].namespaceURI : null;
+    const svg = svgNs ? document.createElementNS(svgNs, "svg") : document.createElement("svg");
+    const ns = svg.namespaceURI;
+    svg.setAttribute("viewBox", "0 0 60 60");
+    svg.setAttribute("aria-hidden", "true");
+
+    const bezel = document.createElementNS(ns, "circle");
+    bezel.setAttribute("cx", "30");
+    bezel.setAttribute("cy", "30");
+    bezel.setAttribute("r", "28");
+    bezel.setAttribute("fill", "#1c1e22");
+    bezel.setAttribute("stroke", "#3e4450");
+    bezel.setAttribute("stroke-width", "2");
+
+    const body = document.createElementNS(ns, "circle");
+    body.setAttribute("cx", "30");
+    body.setAttribute("cy", "30");
+    body.setAttribute("r", "24");
+    body.setAttribute("fill", "#2a2e35");
+    body.setAttribute("stroke", "#121417");
+    body.setAttribute("stroke-width", "1");
+
+    const cap = document.createElementNS(ns, "circle");
+    cap.setAttribute("cx", "30");
+    cap.setAttribute("cy", "30");
+    cap.setAttribute("r", "10");
+    cap.setAttribute("fill", "#1a1d22");
+
+    const ptrGroup = document.createElementNS(ns, "g");
+    ptrGroup.setAttribute("class", "annlab-ptr-group");
+    const ptr = document.createElementNS(ns, "line");
+    ptr.setAttribute("x1", "30");
+    ptr.setAttribute("y1", "30");
+    ptr.setAttribute("x2", "30");
+    ptr.setAttribute("y2", "8");
+    ptr.setAttribute("stroke", "#ffffff");
+    ptr.setAttribute("stroke-width", "2.8");
+    ptr.setAttribute("stroke-linecap", "round");
+    ptrGroup.appendChild(ptr);
+
+    svg.append(bezel, body, cap, ptrGroup);
+    dial.appendChild(svg);
+
+    const label = document.createElement("span");
+    label.className = "annlab-knob-label";
+    label.textContent = knob.label;
+
+    const bubble = document.createElement("span");
+    bubble.className = "annlab-knob-value-bubble";
+    bubble.textContent = formatKnobDisplay(block.block_id, block.model_id, knob.slot, knob.raw);
+
+    wrapper.append(dial, label, bubble);
+
+    let currentVal = clampInt(knob.raw, 0, 100);
+
+    const draw = (val) => {
+      currentVal = clampInt(val, 0, 100);
+      const deg = -135 + (currentVal / 100) * 270;
+      ptrGroup.setAttribute("transform", `rotate(${deg.toFixed(1)} 30 30)`);
+      wrapper.setAttribute("aria-valuenow", String(currentVal));
+      const formatted = formatKnobDisplay(block.block_id, block.model_id, knob.slot, currentVal);
+      bubble.textContent = formatted;
+      wrapper.setAttribute("aria-valuetext", formatted);
+    };
+
+    draw(currentVal);
+
+    let startY = 0;
+    let startVal = 0;
+    let isDragging = false;
+
+    dial.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      dial.setPointerCapture(e.pointerId);
+      startY = e.clientY;
+      startVal = currentVal;
+      isDragging = true;
+      wrapper.classList.add("is-dragging");
+      app.activeDragAddr = knob.addr;
+      markLocalEdit();
+    });
+
+    dial.addEventListener("pointermove", (e) => {
+      if (!isDragging) return;
+      const deltaY = startY - e.clientY;
+      const speed = e.shiftKey ? 0.25 : 0.65;
+      const nextVal = clampInt(Math.round(startVal + deltaY * speed), 0, 100);
+      if (nextVal !== currentVal) {
+        draw(nextVal);
+        updateKnobVisualsInPlace(knob.addr, nextVal, { fromLocal: true });
+        queueKnobChange(knob.addr, nextVal);
+      }
+    });
+
+    const endDrag = (e) => {
+      if (!isDragging) return;
+      isDragging = false;
+      wrapper.classList.remove("is-dragging");
+      try {
+        if (dial.hasPointerCapture(e.pointerId)) {
+          dial.releasePointerCapture(e.pointerId);
+        }
+      } catch (_) {}
+      if (app.activeDragAddr === knob.addr) {
+        app.activeDragAddr = null;
+      }
+      markLocalEdit();
+    };
+
+    dial.addEventListener("pointerup", endDrag);
+    dial.addEventListener("pointercancel", endDrag);
+
+    dial.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const step = e.deltaY < 0 ? 1 : -1;
+      const nextVal = clampInt(currentVal + step, 0, 100);
+      if (nextVal !== currentVal) {
+        draw(nextVal);
+        updateKnobVisualsInPlace(knob.addr, nextVal, { fromLocal: true });
+        queueKnobChange(knob.addr, nextVal);
+      }
+    }, { passive: false });
+
+    dial.addEventListener("dblclick", (e) => {
+      e.preventDefault();
+      const nextVal = 50;
+      draw(nextVal);
+      updateKnobVisualsInPlace(knob.addr, nextVal, { fromLocal: true });
+      queueKnobChange(knob.addr, nextVal);
+    });
+
+    wrapper.addEventListener("keydown", (e) => {
+      const step = e.shiftKey ? 5 : 1;
+      let nextVal = currentVal;
+      if (e.key === "ArrowUp" || e.key === "ArrowRight") {
+        nextVal = clampInt(currentVal + step, 0, 100);
+      } else if (e.key === "ArrowDown" || e.key === "ArrowLeft") {
+        nextVal = clampInt(currentVal - step, 0, 100);
+      } else if (e.key === "PageUp") {
+        nextVal = clampInt(currentVal + 10, 0, 100);
+      } else if (e.key === "PageDown") {
+        nextVal = clampInt(currentVal - 10, 0, 100);
+      } else if (e.key === "Home") {
+        nextVal = 0;
+      } else if (e.key === "End") {
+        nextVal = 100;
+      } else if (e.key === "Delete" || e.key === "Backspace") {
+        nextVal = 50;
+      } else {
+        return;
+      }
+      e.preventDefault();
+      e.stopPropagation();
+      draw(nextVal);
+      updateKnobVisualsInPlace(knob.addr, nextVal, { fromLocal: true });
+      queueKnobChange(knob.addr, nextVal);
+    });
+
+    return { wrapper, update: draw };
+  }
+
+  function renderAnnLabStage() {
+    const stage = els["annlab-stage-view"];
+    if (!stage) return;
+    const ram = app.state?.ram;
+    const block = getBlockById(ram, app.selectedBlockId);
+    const spec = BLOCK_CATALOG[app.selectedBlockId];
+    if (!ram || !block || !spec) return;
+
+    const imgEl = els["annlab-chassis-img"];
+    const lampEl = els["annlab-pilot-lamp"];
+    if (block.block_id === 1) {
+      if (imgEl) imgEl.src = "annlab/amp_background.png";
+      if (lampEl) {
+        lampEl.hidden = false;
+        lampEl.className = `annlab-pilot-lamp ${block.enabled ? "is-on" : "is-off"}`;
+      }
+    } else if (block.block_id === 5) {
+      if (imgEl) imgEl.src = "annlab/cab_background.png";
+      if (lampEl) lampEl.hidden = true;
+    } else if (block.block_id === 0) {
+      if (imgEl) imgEl.src = block.enabled ? "annlab/boost_on.png" : "annlab/boost_off.png";
+      if (lampEl) lampEl.hidden = true;
+    } else if (block.block_id === 2) {
+      if (imgEl) imgEl.src = block.enabled ? "annlab/mod_on.png" : "annlab/mod_off.png";
+      if (lampEl) lampEl.hidden = true;
+    } else if (block.block_id === 3) {
+      if (imgEl) imgEl.src = block.enabled ? "annlab/delay_on.png" : "annlab/delay_off.png";
+      if (lampEl) lampEl.hidden = true;
+    } else if (block.block_id === 4) {
+      if (imgEl) imgEl.src = block.enabled ? "annlab/rev_on.png" : "annlab/rev_off.png";
+      if (lampEl) lampEl.hidden = true;
+    }
+
+    if (els["annlab-block-name"]) {
+      els["annlab-block-name"].textContent = spec.name;
+    }
+    const bypassBtn = els["btn-annlab-block-bypass"];
+    if (bypassBtn) {
+      bypassBtn.className = `annlab-bypass-btn ${block.enabled ? "is-on" : "is-bypassed"}`;
+      bypassBtn.textContent = block.enabled ? "ACTIVE" : "BYPASS";
+    }
+
+    const modelSelect = els["annlab-model-select"];
+    if (modelSelect) {
+      const models = getModelListForBlock(block.block_id, app.state);
+      if (modelSelect.children.length !== models.length) {
+        modelSelect.replaceChildren();
+        for (const mdl of models) {
+          const opt = document.createElement("option");
+          opt.value = String(mdl.id);
+          const idxTag = String(mdl.id).padStart(2, "0");
+          opt.textContent = mdl.minFw ? `${idxTag}: ${mdl.name} (V${mdl.minFw}+)` : `${idxTag}: ${mdl.name}`;
+          modelSelect.appendChild(opt);
+        }
+      }
+      if (document.activeElement !== modelSelect) {
+        modelSelect.value = String(block.model_id);
+      }
+    }
+
+    const knobsLayer = els["annlab-knobs-layer"];
+    if (!knobsLayer) return;
+    knobsLayer.replaceChildren();
+    app.annlabKnobsByAddr.clear();
+
+    const chassisEl = els["annlab-chassis"];
+    const isAmp = block.block_id === 1;
+    if (chassisEl) {
+      chassisEl.classList.toggle("is-amp-mode", isAmp);
+      chassisEl.classList.toggle("is-pedal-mode", !isAmp);
+    }
+    if (els["annlab-pedal-knobs-panel"]) {
+      els["annlab-pedal-knobs-panel"].hidden = isAmp;
+    }
+    if (els["annlab-knobs-panel-title"]) {
+      els["annlab-knobs-panel-title"].textContent = `${spec.name} · ${block.model_name}`;
+    }
+
+    const knobs = block.knobs || [];
+    let positions = [];
+    if (isAmp) {
+      // 5 Amp knobs along faceplate
+      positions = [
+        { x: 29.2, y: 74.0 },
+        { x: 37.8, y: 74.0 },
+        { x: 46.5, y: 74.0 },
+        { x: 55.2, y: 74.0 },
+        { x: 63.8, y: 74.0 },
+      ];
+    } else {
+      // All pedal and cab knobs strictly arranged on the RIGHT side inside the studio panel
+      if (knobs.length === 1) {
+        positions = [{ x: 75.5, y: 52.0 }];
+      } else if (knobs.length === 2) {
+        positions = [
+          { x: 67.0, y: 52.0 },
+          { x: 84.0, y: 52.0 },
+        ];
+      } else if (knobs.length === 3) {
+        positions = [
+          { x: 67.0, y: 35.0 },
+          { x: 84.0, y: 35.0 },
+          { x: 75.5, y: 68.0 },
+        ];
+      } else if (knobs.length === 4) {
+        positions = [
+          { x: 67.0, y: 34.0 },
+          { x: 84.0, y: 34.0 },
+          { x: 67.0, y: 68.0 },
+          { x: 84.0, y: 68.0 },
+        ];
+      } else {
+        // 5+ knobs
+        positions = [
+          { x: 63.5, y: 34.0 },
+          { x: 75.5, y: 34.0 },
+          { x: 87.5, y: 34.0 },
+          { x: 69.5, y: 68.0 },
+          { x: 81.5, y: 68.0 },
+        ];
+      }
+    }
+
+    knobs.forEach((knob, idx) => {
+      const pos = positions[idx] || { x: 30 + idx * 15, y: 50 };
+      const knobObj = createAnnLabKnob({ knob, block, spec, posX: pos.x, posY: pos.y });
+      app.annlabKnobsByAddr.set(knob.addr, knobObj);
+      knobsLayer.appendChild(knobObj.wrapper);
+    });
   }
 
   function togglePresetsDrawer(forceState) {
@@ -2849,6 +3447,8 @@
     renderPedalboard();
     renderAmpStage();
     renderInspector();
+    renderAnnLabPresetCapsule();
+    renderAnnLabStage();
     if (els["effects-drawer"] && !els["effects-drawer"].hidden) {
       renderEffectsLibrary();
     }
@@ -3158,6 +3758,54 @@
       });
     }
 
+    if (els["btn-toggle-view"]) {
+      els["btn-toggle-view"].addEventListener("click", () => {
+        setViewMode(app.viewMode === "annlab" ? "pedalboard" : "annlab");
+      });
+    }
+
+    if (els["btn-toggle-large"]) {
+      els["btn-toggle-large"].addEventListener("click", () => {
+        toggleLargeMode();
+      });
+    }
+
+    if (els["btn-annlab-bypass"]) {
+      els["btn-annlab-bypass"].addEventListener("click", () => {
+        const ram = app.state?.ram;
+        const block = getBlockById(ram, app.selectedBlockId);
+        if (block) {
+          void handleToggleBlock(block.block_id, !block.enabled);
+        }
+      });
+    }
+
+    if (els["btn-annlab-block-bypass"]) {
+      els["btn-annlab-block-bypass"].addEventListener("click", () => {
+        const ram = app.state?.ram;
+        const block = getBlockById(ram, app.selectedBlockId);
+        if (block) {
+          void handleToggleBlock(block.block_id, !block.enabled);
+        }
+      });
+    }
+
+    if (els["btn-annlab-import"]) {
+      els["btn-annlab-import"].addEventListener("click", () => {
+        const cat = app.selectedBlockId === 5 ? "cab" : "amp";
+        openCaptureManager(cat);
+      });
+    }
+
+    if (els["annlab-model-select"]) {
+      els["annlab-model-select"].addEventListener("change", (e) => {
+        const block = getBlockById(app.state?.ram, app.selectedBlockId);
+        if (block) {
+          void handleChangeModel(block.block_id, Number(e.target.value));
+        }
+      });
+    }
+
     if (els["capture-file-input"]) {
       els["capture-file-input"].addEventListener("change", (ev) => {
         const file = ev.target.files?.[0];
@@ -3212,6 +3860,7 @@
   async function init() {
     cacheElements();
     bindEvents();
+    initAnnLabView();
     await Promise.all([refreshPorts(), refreshState({ silent: true }), refreshPresetsCatalog()]);
     app.pollTimerId = setInterval(() => {
       if (app.state?.connected) {
