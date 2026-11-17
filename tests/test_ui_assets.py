@@ -388,6 +388,54 @@ class UIAssetsTests(unittest.TestCase):
         self.assertIn("toggleEffectsDrawer", js_text)
         self.assertIn("renderEffectsLibrary", js_text)
 
+    def test_comprehensive_skeuomorphic_ui_integration(self) -> None:
+        port = self._start_demo_server()
+
+        # 1. Verify HTML served contains all UltraRig components
+        status, headers, html_raw = self._get(port, "/")
+        self.assertEqual(status, 200)
+        html_text = html_raw.decode("utf-8")
+        for token in (
+            "signal-flow-minimap",
+            "section-tabs",
+            "tab-pedalera",
+            "tab-pedales",
+            "tab-amp",
+            "tab-post-amp",
+            "amp-stage-view",
+            "amp-head-enclosure",
+            "cab-enclosure",
+            "patch-cables-svg",
+            "presets-drawer",
+            "effects-drawer",
+            "btn-toggle-presets",
+            "btn-toggle-effects",
+            "knob-floating-tooltip",
+        ):
+            self.assertIn(token, html_text, f"Token missing from served index.html: {token}")
+
+        # 2. Verify styles.css served contains skeuomorphic theme rules
+        status_css, _, css_raw = self._get(port, "/styles.css")
+        self.assertEqual(status_css, 200)
+        css_text = css_raw.decode("utf-8")
+        for rule in (
+            "pedal-svg-skeuo",
+            "rotary-knob-group",
+            "patch-cables-layer",
+            "amp-tolex",
+            "section-tabs",
+            "drawer-panel",
+            "pedal-theme-smart-signal",
+        ):
+            self.assertIn(rule, css_text, f"Rule missing from served styles.css: {rule}")
+
+        # 3. Verify app.js is served clean and offline
+        status_js, _, js_raw = self._get(port, "/app.js")
+        self.assertEqual(status_js, 200)
+        js_text = js_raw.decode("utf-8")
+        self.assertNotIn(".innerHTML", js_text)
+        self.assertNotIn("insertAdjacentHTML", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()
