@@ -488,6 +488,60 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status_bad_imp, 400)
         self.assertIn("error", bad_imp_body)
 
+    def test_capture_manager_integration_end_to_end(self) -> None:
+        import base64
+
+        _, _, port = self._start_server(demo=True)
+
+        # 1. Fetch curated library
+        s_lib, _, b_lib = self._json_request(port, "GET", "/api/models/library")
+        self.assertEqual(s_lib, 200)
+        categories = b_lib["library"]["categories"]
+        od_cat = next(c for c in categories if c["id"] == "overdrives")
+        self.assertGreaterEqual(len(od_cat["models"]), 3)
+
+        # 2. Validate import of user capture
+        raw_am4 = b"AM4\x00TS808 Custom\x00\x00" + b"\x00" * 100
+        b64 = base64.b64encode(raw_am4).decode("ascii")
+        s_val, _, b_val = self._json_request(
+            port,
+            "POST",
+            "/api/models/validate_import",
+            {"filename": "TS808.am4", "content_base64": b64},
+        )
+        self.assertEqual(s_val, 200)
+        self.assertEqual(b_val["details"]["name"], "TS808 Custom")
+
+        # 3. Rename AMP slot 0 to the validated capture name
+        s_ren, _, b_ren = self._json_request(
+            port,
+            "POST",
+            "/api/models/rename",
+            {"category": "amp", "slot": 0, "name": b_val["details"]["name"]},
+        )
+        self.assertEqual(s_ren, 200)
+        self.assertEqual(b_ren["state"]["amps"][0], "TS808 Custom")
+
+        # 4. Audition slot 0 in live RAM
+        s_aud, _, b_aud = self._json_request(
+            port,
+            "POST",
+            "/api/models/audition",
+            {"category": "amp", "slot": 0},
+        )
+        self.assertEqual(s_aud, 200)
+        amp_blk = next(b for b in b_aud["state"]["ram"]["blocks"] if b["block_id"] == 1)
+        self.assertEqual(amp_blk["model_id"], 0)
+        self.assertTrue(amp_blk["enabled"])
+
+        # 5. Query /api/state to verify roundtrip state sync
+        s_st, _, b_st = self._json_request(port, "GET", "/api/state")
+        self.assertEqual(s_st, 200)
+        self.assertEqual(b_st["amps"][0], "TS808 Custom")
+        amp_st = next(b for b in b_st["ram"]["blocks"] if b["block_id"] == 1)
+        self.assertEqual(amp_st["model_id"], 0)
+        self.assertTrue(amp_st["enabled"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -377,6 +377,46 @@ class WinMMTransportTests(unittest.TestCase):
             f"Expected ME-01_ identity string, got {identity!r}",
         )
 
+    def test_live_me01_query_names_tables_if_connected(self) -> None:
+        from me01_rig.protocol import (
+            ADDR_AMP_NAMES,
+            ADDR_CAB_NAMES,
+            SPACE_NAMES,
+            build_read_request,
+            decode_name_table,
+        )
+
+        pairs = find_candidate_pairs()
+        usb_pairs = [
+            p
+            for p in pairs
+            if "usb-midi" in p.in_name.lower() and "usb-midi" in p.out_name.lower()
+        ]
+        if not usb_pairs:
+            self.skipTest("No live USB-Midi input/output pair connected")
+
+        pair = usb_pairs[0]
+        with WinMMTransport(pair.in_id, pair.out_id) as transport:
+            # Query AMP names table (280 bytes)
+            req_amp = wrap_sysex(build_read_request(SPACE_NAMES, ADDR_AMP_NAMES, 280))
+            reply_amp = transport.transact(req_amp, timeout_ms=1000)
+            frame_amp = parse_frame(unwrap_sysex(reply_amp))
+            self.assertEqual(frame_amp.cmd, 0x23)
+            self.assertEqual(len(frame_amp.data), 280)
+            amp_names = decode_name_table(frame_amp.data)
+            self.assertEqual(len(amp_names), 20)
+            self.assertTrue(all(isinstance(n, str) for n in amp_names))
+
+            # Query CAB names table (280 bytes)
+            req_cab = wrap_sysex(build_read_request(SPACE_NAMES, ADDR_CAB_NAMES, 280))
+            reply_cab = transport.transact(req_cab, timeout_ms=1000)
+            frame_cab = parse_frame(unwrap_sysex(reply_cab))
+            self.assertEqual(frame_cab.cmd, 0x23)
+            self.assertEqual(len(frame_cab.data), 280)
+            cab_names = decode_name_table(frame_cab.data)
+            self.assertEqual(len(cab_names), 20)
+            self.assertTrue(all(isinstance(n, str) for n in cab_names))
+
 
 if __name__ == "__main__":
     unittest.main()
