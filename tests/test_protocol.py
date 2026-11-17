@@ -149,6 +149,20 @@ class ProtocolTests(unittest.TestCase):
         with self.assertRaises(ProtocolError):
             parse_frame(unwrap_sysex(wrap_sysex(b"\x7e\x7f\x06\x01\x00\x00\x00")))
 
+        # Short 0x22 / 0x23 body (< 8 bytes)
+        for mem_cmd in (0x22, 0x23):
+            with self.subTest(mem_cmd=hex(mem_cmd), case="short_body"):
+                with self.assertRaises(ProtocolError):
+                    parse_frame(build_frame(mem_cmd, b"\x04\x00\x00\x00\x10\x04\x00"))
+
+        # 0x22 write with declared size > 0 and empty payload must fail
+        with self.assertRaises(ProtocolError):
+            parse_frame(build_frame(0x22, b"\x04\x00\x00\x00\x10\x04\x00\x00"))
+
+        # 0x23 reply with non-empty data whose length != declared size must fail
+        with self.assertRaises(ProtocolError):
+            parse_frame(build_frame(0x23, b"\x04\x00\x00\x00\x10\x04\x00\x00\x01\x02"))
+
     def test_preset_image_roundtrip(self) -> None:
         ram_bytes = bytes.fromhex(self.fixtures["ram_hex"])
         p72 = PresetImage.from_bytes(ram_bytes)
@@ -194,10 +208,36 @@ class ProtocolTests(unittest.TestCase):
         bad_order[2:8] = bytes([0, 0, 1, 2, 3, 4])
         with self.assertRaises(ProtocolError):
             PresetImage.from_bytes(bytes(bad_order))
-        bad_dict = dict(d)
-        bad_dict["states"] = ["bad", 0, 0, 0, 0, 0]
+        bad_vol = bytearray(ram_bytes)
+        bad_vol[0:2] = (101).to_bytes(2, "little")
         with self.assertRaises(ProtocolError):
-            PresetImage.from_dict(bad_dict)
+            PresetImage.from_bytes(bytes(bad_vol))
+        bad_model = bytearray(ram_bytes)
+        bad_model[14] = 99
+        with self.assertRaises(ProtocolError):
+            PresetImage.from_bytes(bytes(bad_model))
+
+        for key, bad_val in (
+            ("volume", 101),
+            ("order", [0, 0, 1, 2, 3, 4]),
+            ("states", ["bad", 0, 0, 0, 0, 0]),
+            ("states", [1, 1, 1, 1, 1]),
+            ("models", [0, 0, 0, 0, 0]),
+            ("knobs", [[0] * 6] * 5),
+            ("knobs", [[0] * 5] * 6),
+        ):
+            with self.subTest(bad_dict_key=key):
+                bad_dict = dict(d)
+                bad_dict[key] = bad_val
+                with self.assertRaises(ProtocolError):
+                    PresetImage.from_dict(bad_dict)
+
+        # Post-mutation invalid fields must still be rejected on serialization
+        mutated.order = [0, 0, 1, 2, 3, 4]
+        with self.assertRaises(ProtocolError):
+            mutated.to_bytes()
+        with self.assertRaises(ProtocolError):
+            mutated.to_dict()
 
     def test_write_allowlist_and_validation(self) -> None:
         routing_frame = build_change_routing([0, 1, 5, 2, 3, 4])

@@ -283,9 +283,14 @@ def parse_frame(frame: bytes) -> ParsedFrame:
         address = int.from_bytes(body[1:5], "little")
         size = int.from_bytes(body[5:8], "little")
         mem_data = body[8:]
-        if len(mem_data) not in (0, size):
+        if cmd == CMD_WRITE:
+            if len(mem_data) != size:
+                raise ProtocolError(
+                    f"Write payload length mismatch: declared size {size}, got {len(mem_data)}"
+                )
+        elif len(mem_data) not in (0, size):
             raise ProtocolError(
-                f"Memory payload length mismatch: declared size {size}, got {len(mem_data)}"
+                f"Read payload length mismatch: declared size {size}, got {len(mem_data)}"
             )
         return ParsedFrame(
             cmd=cmd,
@@ -466,6 +471,9 @@ class PresetImage:
     knobs: list[list[int]]
 
     def __post_init__(self) -> None:
+        self._validate()
+
+    def _validate(self) -> None:
         self.volume = _require_range(self.volume, 0, 100, "volume")
 
         order_seq = _require_sequence(self.order, 6, "order")
@@ -528,6 +536,7 @@ class PresetImage:
 
     def to_bytes(self) -> bytes:
         """Serialize this PresetImage back to an exact 92-byte hardware buffer."""
+        self._validate()
         buf = bytearray(PRESET_SIZE)
         buf[0:2] = self.volume.to_bytes(2, "little")
         buf[2:8] = bytes(self.order)
@@ -545,6 +554,7 @@ class PresetImage:
         cabs: Sequence[str] | None = None,
     ) -> dict[str, Any]:
         """Convert to a JSON-serializable dict, optionally resolving live AMP/CAB names."""
+        self._validate()
         blocks_payload: list[dict[str, Any]] = []
         for blk in BLOCK_IDS:
             spec = BLOCKS[blk]
