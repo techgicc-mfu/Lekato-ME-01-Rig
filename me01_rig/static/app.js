@@ -1444,14 +1444,14 @@
       } else if (tplId === "tpl-pedal-skeuo") {
         const count = knobs.length;
         if (count === 1) {
-          appendMiniKnobSvg(knobsLayer, ns, 65, 72, 13, knobs[0].slot, knobs[0].raw);
+          appendInteractiveKnobSvg(knobsLayer, ns, 65, 72, 13, knobs[0], block);
         } else if (count === 2) {
-          appendMiniKnobSvg(knobsLayer, ns, 44, 72, 11, knobs[0].slot, knobs[0].raw);
-          appendMiniKnobSvg(knobsLayer, ns, 86, 72, 11, knobs[1].slot, knobs[1].raw);
+          appendInteractiveKnobSvg(knobsLayer, ns, 44, 72, 11, knobs[0], block);
+          appendInteractiveKnobSvg(knobsLayer, ns, 86, 72, 11, knobs[1], block);
         } else if (count === 3) {
-          appendMiniKnobSvg(knobsLayer, ns, 34, 72, 9.5, knobs[0].slot, knobs[0].raw);
-          appendMiniKnobSvg(knobsLayer, ns, 65, 72, 9.5, knobs[1].slot, knobs[1].raw);
-          appendMiniKnobSvg(knobsLayer, ns, 96, 72, 9.5, knobs[2].slot, knobs[2].raw);
+          appendInteractiveKnobSvg(knobsLayer, ns, 34, 72, 9.5, knobs[0], block);
+          appendInteractiveKnobSvg(knobsLayer, ns, 65, 72, 9.5, knobs[1], block);
+          appendInteractiveKnobSvg(knobsLayer, ns, 96, 72, 9.5, knobs[2], block);
         } else {
           const topCount = count <= 4 ? 2 : 3;
           knobs.forEach((knob, idx) => {
@@ -1462,7 +1462,7 @@
             const startX = 65 - ((rowTotal - 1) * spacing) / 2;
             const cx = startX + rowIndex * spacing;
             const cy = isSecondRow ? 91 : 57;
-            appendMiniKnobSvg(knobsLayer, ns, cx, cy, 8.2, knob.slot, knob.raw);
+            appendInteractiveKnobSvg(knobsLayer, ns, cx, cy, 8.2, knob, block);
           });
         }
       } else {
@@ -1485,6 +1485,163 @@
       svg.style.setProperty("--block-color", spec.colorVar);
     }
     return svg;
+  }
+
+  function formatKnobValue(knob, raw) {
+    const val = clampInt(raw, 0, knob.max ?? 100);
+    if (!knob) return String(val);
+    if (knob.unit === "ms") return `${val * 10} ms`;
+    if (knob.unit === "Hz") return `${val * 2} Hz`;
+    if (knob.unit === "kHz") return `${(5.0 + (val / 100) * 13.0).toFixed(1)} kHz`;
+    if (knob.unit === "dB") return `${val - 50} dB`;
+    return `${val}`;
+  }
+
+  let tooltipHideTimer = null;
+
+  function showKnobTooltip(knobEl, label, formattedVal) {
+    if (tooltipHideTimer) {
+      clearTimeout(tooltipHideTimer);
+      tooltipHideTimer = null;
+    }
+    const tooltip = els["knob-floating-tooltip"];
+    if (!tooltip) return;
+    const rect = knobEl.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.top = `${rect.top}px`;
+    tooltip.replaceChildren();
+
+    const lblSpan = document.createElement("span");
+    lblSpan.className = "knob-tooltip-label";
+    lblSpan.textContent = label;
+
+    const valSpan = document.createElement("span");
+    valSpan.className = "knob-tooltip-val";
+    valSpan.textContent = formattedVal;
+
+    tooltip.append(lblSpan, valSpan);
+    tooltip.hidden = false;
+  }
+
+  function hideKnobTooltip() {
+    if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = setTimeout(() => {
+      const tooltip = els["knob-floating-tooltip"];
+      if (tooltip) tooltip.hidden = true;
+    }, 120);
+  }
+
+  function updateKnobAngle(pointerGroup, cx, cy, raw, maxVal = 100) {
+    const deg = -135 + (clampInt(raw, 0, maxVal) / maxVal) * 270;
+    pointerGroup.setAttribute("transform", `rotate(${deg.toFixed(1)} ${cx} ${cy})`);
+  }
+
+  function appendInteractiveKnobSvg(layer, ns, cx, cy, radius, knob, block) {
+    const group = document.createElementNS(ns, "g");
+    group.setAttribute("class", "rotary-knob-group");
+    group.setAttribute("data-knob-slot", String(knob.slot));
+    group.setAttribute("data-knob-addr", String(knob.addr));
+
+    const dial = document.createElementNS(ns, "circle");
+    dial.setAttribute("cx", String(cx));
+    dial.setAttribute("cy", String(cy));
+    dial.setAttribute("r", String(radius));
+    dial.setAttribute("class", "rotary-dial");
+
+    const pointerGroup = document.createElementNS(ns, "g");
+    pointerGroup.setAttribute("class", "rotary-pointer-group");
+    const maxVal = knob.max ?? 100;
+    updateKnobAngle(pointerGroup, cx, cy, knob.raw, maxVal);
+
+    const notch = document.createElementNS(ns, "line");
+    notch.setAttribute("x1", String(cx));
+    notch.setAttribute("y1", String(cy));
+    notch.setAttribute("x2", String(cx));
+    notch.setAttribute("y2", String(cy - radius + 2));
+    notch.setAttribute("class", "rotary-notch");
+
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", String(cx));
+    dot.setAttribute("cy", String(cy - radius + 3));
+    dot.setAttribute("r", String(Math.max(1.0, radius * 0.12)));
+    dot.setAttribute("class", "rotary-dot");
+
+    pointerGroup.append(notch, dot);
+
+    const cap = document.createElementNS(ns, "circle");
+    cap.setAttribute("cx", String(cx));
+    cap.setAttribute("cy", String(cy));
+    cap.setAttribute("r", String(radius * 0.42));
+    cap.setAttribute("class", "rotary-knob-cap");
+
+    group.append(dial, pointerGroup, cap);
+
+    if (radius >= 8.5 && knob.name) {
+      const lbl = document.createElementNS(ns, "text");
+      lbl.setAttribute("x", String(cx));
+      lbl.setAttribute("y", String(cy + radius + 7));
+      lbl.setAttribute("class", "rotary-knob-label");
+      lbl.textContent = knob.name.slice(0, 5);
+      group.append(lbl);
+    }
+
+    let isDragging = false;
+    let startY = 0;
+    let startVal = knob.raw;
+
+    group.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      isDragging = true;
+      startY = ev.clientY;
+      startVal = knob.raw;
+      group.setPointerCapture(ev.pointerId);
+      group.classList.add("is-active");
+      showKnobTooltip(group, knob.name, formatKnobValue(knob, knob.raw));
+    });
+
+    group.addEventListener("pointermove", (ev) => {
+      if (!isDragging) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const deltaY = startY - ev.clientY;
+      const nextVal = clampInt(Math.round(startVal + deltaY * 0.6), 0, maxVal);
+      if (nextVal !== knob.raw) {
+        knob.raw = nextVal;
+        updateKnobAngle(pointerGroup, cx, cy, nextVal, maxVal);
+        showKnobTooltip(group, knob.name, formatKnobValue(knob, nextVal));
+        queueKnobChange(knob.addr, nextVal);
+      }
+    });
+
+    const onPointerEnd = (ev) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        group.releasePointerCapture(ev.pointerId);
+      } catch (_) {}
+      group.classList.remove("is-active");
+      hideKnobTooltip();
+    };
+
+    group.addEventListener("pointerup", onPointerEnd);
+    group.addEventListener("pointercancel", onPointerEnd);
+
+    group.addEventListener("wheel", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const step = ev.deltaY < 0 ? 1 : -1;
+      const nextVal = clampInt(knob.raw + step, 0, maxVal);
+      if (nextVal !== knob.raw) {
+        knob.raw = nextVal;
+        updateKnobAngle(pointerGroup, cx, cy, nextVal, maxVal);
+        showKnobTooltip(group, knob.name, formatKnobValue(knob, nextVal));
+        queueKnobChange(knob.addr, nextVal);
+        hideKnobTooltip();
+      }
+    }, { passive: false });
+
+    layer.append(group);
   }
 
   function appendMiniKnobSvg(layer, ns, cx, cy, radius, slot, raw) {

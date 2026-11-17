@@ -244,6 +244,35 @@ class UIAssetsTests(unittest.TestCase):
         # 4. app.js references tpl-pedal-skeuo
         self.assertIn("tpl-pedal-skeuo", js_text)
 
+    def test_interactive_rotary_knobs_and_tooltip(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. Floating tooltip element in index.html
+        self.assertIn('id="knob-floating-tooltip"', html_text)
+
+        # 2. Rotary knob CSS classes in styles.css
+        for cls in (
+            "rotary-knob-group",
+            "rotary-dial",
+            "rotary-notch",
+            "rotary-dot",
+            "knob-floating-tooltip",
+        ):
+            self.assertIn(cls, css_text, f"Missing knob CSS class: {cls}")
+
+        # 3. Pointer drag & wheel listeners with setPointerCapture
+        self.assertIn("setPointerCapture", js_text)
+        self.assertIn("releasePointerCapture", js_text)
+        self.assertIn("pointerdown", js_text)
+        self.assertIn("pointermove", js_text)
+        self.assertIn("pointerup", js_text)
+
+        # 4. Value clamping and queueKnobChange integration
+        self.assertIn("clampInt", js_text)
+        self.assertIn("queueKnobChange", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()
