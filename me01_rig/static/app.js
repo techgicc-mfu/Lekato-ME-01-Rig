@@ -1425,7 +1425,7 @@
         const nameEl = document.createElement("div");
         nameEl.className = "capture-slot-name";
         nameEl.textContent = displayName;
-        nameEl.title = "Doble clic para renombrar";
+        nameEl.title = "Double-click to rename";
         nameEl.addEventListener("dblclick", () => {
           app.captureRenamingSlot = slotIndex;
           renderCaptureManagerSlots();
@@ -1440,7 +1440,7 @@
         tag.textContent = isAmp ? "Preamp / Capture" : "Cabinet IR";
 
         const statusNote = document.createElement("span");
-        statusNote.textContent = isActive ? "ACTIVO EN RAM" : "";
+        statusNote.textContent = isActive ? "ACTIVE IN RAM" : "";
         if (isActive) statusNote.style.color = "var(--accent-cyan)";
 
         meta.appendChild(tag);
@@ -1462,10 +1462,10 @@
       if (res && res.state) {
         app.state = res.state;
         renderAll();
-        showToast(`Audicionando Slot ${slotIndex + 1} en RAM`, "success");
+        showToast(`Auditioning Slot ${slotIndex + 1} in RAM`, "success");
       }
     } catch (err) {
-      showToast(`Error al audicionar slot: ${err.message}`, "error");
+      showToast(`Error auditioning slot: ${err.message}`, "error");
     }
   }
 
@@ -1480,10 +1480,10 @@
         app.state = res.state;
         app.captureRenamingSlot = null;
         renderAll();
-        showToast(`Slot ${slotIndex + 1} renombrado a "${res.name}"`, "success");
+        showToast(`Slot ${slotIndex + 1} renamed to "${res.name}"`, "success");
       }
     } catch (err) {
-      showToast(`Error al renombrar slot: ${err.message}`, "error");
+      showToast(`Error renaming slot: ${err.message}`, "error");
     }
   }
 
@@ -1536,8 +1536,8 @@
         const assignBtn = document.createElement("button");
         assignBtn.type = "button";
         assignBtn.className = "capture-lib-assign-btn";
-        assignBtn.textContent = `Asignar a ${slotLabel}`;
-        assignBtn.title = `Asignar nombre "${model.name}" al ${slotLabel} activo en hardware`;
+        assignBtn.textContent = `Assign to ${slotLabel}`;
+        assignBtn.title = `Assign name "${model.name}" to active ${slotLabel} on hardware`;
         assignBtn.addEventListener("click", () => {
           void renameCaptureSlot(app.captureCategory, activeSlot, model.name);
         });
@@ -1556,7 +1556,7 @@
     const statusEl = els["capture-import-status"];
     if (!statusEl) return;
     statusEl.hidden = false;
-    statusEl.textContent = `Validando ${file.name}...`;
+    statusEl.textContent = `Validating ${file.name}...`;
 
     try {
       const b64 = await readFileAsBase64(file);
@@ -1568,7 +1568,7 @@
       statusEl.replaceChildren();
       const pSuccess = document.createElement("div");
       pSuccess.style.color = "var(--success)";
-      pSuccess.textContent = `✅ Archivo válido: ${file.name}`;
+      pSuccess.textContent = `✅ Valid file: ${file.name}`;
       statusEl.appendChild(pSuccess);
 
       const pDetails = document.createElement("div");
@@ -1577,7 +1577,7 @@
       if (res.kind === "cab" && res.details.sample_rate) {
         pDetails.textContent = `IR WAV: ${res.details.sample_rate} Hz, ${res.details.bits_per_sample}-bit, ${res.details.channels} ch, ${sampleCount} samples (${byteSize} bytes)`;
       } else {
-        pDetails.textContent = `Captura AM4: Modelo "${res.details.name}", tamaño ${byteSize} bytes`;
+        pDetails.textContent = `AM4 Capture: Model "${res.details.name}", size ${byteSize} bytes`;
       }
       statusEl.appendChild(pDetails);
 
@@ -1592,19 +1592,19 @@
       assignBtn.className = "btn btn-primary btn-sm";
       assignBtn.style.marginTop = "6px";
       const detectedName = res.details.name || file.name.replace(/\.[^/.]+$/, "");
-      assignBtn.textContent = `Asignar "${detectedName}" a ${slotLabel}`;
+      assignBtn.textContent = `Assign "${detectedName}" to ${slotLabel}`;
       assignBtn.addEventListener("click", () => {
         void renameCaptureSlot(res.kind, activeSlot, detectedName);
       });
       statusEl.appendChild(assignBtn);
-      showToast(`Archivo validado: ${detectedName}`, "success");
+      showToast(`File validated: ${detectedName}`, "success");
     } catch (err) {
       statusEl.replaceChildren();
       const pError = document.createElement("div");
       pError.style.color = "var(--danger)";
-      pError.textContent = `❌ Error de validación: ${err.message}`;
+      pError.textContent = `❌ Validation error: ${err.message}`;
       statusEl.appendChild(pError);
-      showToast(`Error al validar archivo: ${err.message}`, "error");
+      showToast(`Error validating file: ${err.message}`, "error");
     }
   }
 
@@ -1617,10 +1617,10 @@
           const commaIdx = result.indexOf(",");
           resolve(commaIdx >= 0 ? result.slice(commaIdx + 1) : result);
         } else {
-          reject(new Error("Formato de lectura inesperado"));
+          reject(new Error("Unexpected file read format"));
         }
       };
-      reader.onerror = () => reject(reader.error || new Error("Error leyendo archivo"));
+      reader.onerror = () => reject(reader.error || new Error("Error reading file"));
       reader.readAsDataURL(file);
     });
   }
