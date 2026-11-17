@@ -39,6 +39,13 @@ from .protocol import (
     unwrap_sysex,
     wrap_sysex,
 )
+from .winmm_midi import (
+    MidiPortPair,
+    MidiTransportError,
+    WinMMTransport,
+    enumerate_midi_ports,
+    find_candidate_pairs,
+)
 
 __all__ = [
     "ACK_FRAME",
@@ -56,10 +63,13 @@ __all__ = [
     "TOTAL_PRESET_SLOTS",
     "BlockSpec",
     "FactorySlotLockedError",
+    "MidiPortPair",
+    "MidiTransportError",
     "ModelSpec",
     "ParsedFrame",
     "PresetImage",
     "ProtocolError",
+    "WinMMTransport",
     "bpm_to_delay_raw",
     "build_change_knob",
     "build_change_model",
@@ -73,6 +83,8 @@ __all__ = [
     "decode7",
     "decode_name_table",
     "encode7",
+    "enumerate_midi_ports",
+    "find_candidate_pairs",
     "format_knob_display",
     "is_ack_frame",
     "parse_frame",
