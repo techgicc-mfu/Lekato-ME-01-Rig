@@ -209,6 +209,255 @@ class UIAssetsTests(unittest.TestCase):
         self.assertIn("app.knobQueue.get(addr) !== entry", js_text)
         self.assertIn('event.target.value = ""', js_text)
 
+    def test_skeuomorphic_pedal_templates_and_themes(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. Template exists in index.html
+        self.assertIn('id="tpl-pedal-skeuo"', html_text)
+
+        # 2. Required SVG elements in template
+        for el in (
+            "svg-chassis-bevel",
+            "svg-chassis-screw",
+            "svg-jack-left",
+            "svg-jack-right",
+            "svg-switch-ring",
+            "svg-switch-plunger",
+            "svg-led-jewel",
+        ):
+            self.assertIn(el, html_text, f"Missing SVG template element: {el}")
+
+        # 3. CSS theme classes in styles.css
+        for theme in (
+            "pedal-theme-smart-signal",
+            "pedal-theme-silver-squeeze",
+            "pedal-theme-blues-racer",
+            "pedal-theme-phase-91",
+            "pedal-theme-double-vision",
+            "pedal-theme-lightning-mistress",
+            "pedal-theme-digital-echo",
+        ):
+            self.assertIn(theme, css_text, f"Missing CSS theme class: {theme}")
+
+        # 4. app.js references tpl-pedal-skeuo
+        self.assertIn("tpl-pedal-skeuo", js_text)
+
+    def test_interactive_rotary_knobs_and_tooltip(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. Floating tooltip element in index.html
+        self.assertIn('id="knob-floating-tooltip"', html_text)
+
+        # 2. Rotary knob CSS classes in styles.css
+        for cls in (
+            "rotary-knob-group",
+            "rotary-dial",
+            "rotary-notch",
+            "rotary-dot",
+            "knob-floating-tooltip",
+        ):
+            self.assertIn(cls, css_text, f"Missing knob CSS class: {cls}")
+
+        # 3. Pointer drag & wheel listeners with setPointerCapture
+        self.assertIn("setPointerCapture", js_text)
+        self.assertIn("releasePointerCapture", js_text)
+        self.assertIn("pointerdown", js_text)
+        self.assertIn("pointermove", js_text)
+        self.assertIn("pointerup", js_text)
+
+        # 4. Value clamping and queueKnobChange integration
+        self.assertIn("clampInt", js_text)
+        self.assertIn("queueKnobChange", js_text)
+
+    def test_dynamic_patch_cable_routing(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #patch-cables-svg overlay in index.html
+        self.assertIn('id="patch-cables-svg"', html_text)
+
+        # 2. CSS classes in styles.css
+        for cls in (
+            "patch-cables-layer",
+            "patch-cable-outer",
+            "patch-cable-inner",
+            "patch-cable-dimmed",
+        ):
+            self.assertIn(cls, css_text, f"Missing patch cable CSS class: {cls}")
+
+        # 3. renderPatchCables with Bezier paths in app.js
+        self.assertIn("renderPatchCables", js_text)
+        self.assertIn("patch-cable-dimmed", js_text)
+        self.assertIn("ResizeObserver", js_text)
+
+    def test_photorealistic_amp_head_and_cab_stage(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #amp-stage-view exists in index.html
+        self.assertIn('id="amp-stage-view"', html_text)
+
+        # 2. Required Amp Head elements in html / css
+        for cls in (
+            "amp-head-enclosure",
+            "amp-tolex",
+            "amp-faceplate",
+            "amp-model-badge",
+            "amp-jewel-lamp",
+            "amp-chicken-knobs",
+            "amp-power-toggle",
+        ):
+            self.assertTrue(cls in html_text or cls in css_text, f"Missing Amp Head element: {cls}")
+
+        # 3. Required Cabinet elements in html / css
+        for cls in (
+            "cab-enclosure",
+            "cab-grille-cloth",
+            "cab-piping",
+            "cab-corners",
+            "cab-knobs",
+        ):
+            self.assertTrue(cls in html_text or cls in css_text, f"Missing Cabinet element: {cls}")
+
+        # 4. renderAmpStage in app.js
+        self.assertIn("renderAmpStage", js_text)
+
+        # 5. Omit ghost controls (Mono/Stereo, Standby, Presence on Amp head)
+        self.assertNotIn("amp-standby", html_text.lower())
+        self.assertNotIn("amp-presence", html_text.lower())
+
+    def test_section_tabs_and_signal_flow_minimap(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #section-tabs and tab buttons in index.html
+        self.assertIn('id="section-tabs"', html_text)
+        for tab_id in ("tab-pedalera", "tab-pedales", "tab-amp", "tab-post-amp"):
+            self.assertIn(tab_id, html_text, f"Missing section tab: {tab_id}")
+
+        # 2. #signal-flow-minimap in index.html
+        self.assertIn('id="signal-flow-minimap"', html_text)
+
+        # 3. CSS classes in styles.css
+        for cls in (
+            "section-tabs",
+            "section-tab",
+            "signal-flow-minimap",
+            "minimap-node",
+            "minimap-chip",
+        ):
+            self.assertIn(cls, css_text, f"Missing minimap CSS class: {cls}")
+
+        # 4. setSectionTab and dynamic filtering in app.js
+        self.assertIn("setSectionTab", js_text)
+        self.assertIn("renderSignalFlowMinimap", js_text)
+
+    def test_effects_library_and_presets_drawer(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #effects-drawer, #presets-drawer, #effects-search in index.html
+        self.assertIn('id="effects-drawer"', html_text)
+        self.assertIn('id="presets-drawer"', html_text)
+        self.assertIn('id="effects-search"', html_text)
+
+        # 2. Toggle buttons exist
+        self.assertIn('id="btn-toggle-presets"', html_text)
+        self.assertIn('id="btn-toggle-effects"', html_text)
+
+        # 3. CSS drawer classes
+        for cls in (
+            "drawer-panel",
+            "drawer-open",
+            "effects-category",
+            "effects-grid",
+            "effect-card-tile",
+        ):
+            self.assertIn(cls, css_text, f"Missing drawer CSS class: {cls}")
+
+        # 4. Keyboard shortcuts and drawer handlers in app.js
+        self.assertIn("togglePresetsDrawer", js_text)
+        self.assertIn("toggleEffectsDrawer", js_text)
+        self.assertIn("renderEffectsLibrary", js_text)
+
+    def test_comprehensive_skeuomorphic_ui_integration(self) -> None:
+        port = self._start_demo_server()
+
+        # 1. Verify HTML served contains all UltraRig components
+        status, headers, html_raw = self._get(port, "/")
+        self.assertEqual(status, 200)
+        html_text = html_raw.decode("utf-8")
+        for token in (
+            "signal-flow-minimap",
+            "section-tabs",
+            "tab-pedalera",
+            "tab-pedales",
+            "tab-amp",
+            "tab-post-amp",
+            "amp-stage-view",
+            "amp-head-enclosure",
+            "cab-enclosure",
+            "patch-cables-svg",
+            "presets-drawer",
+            "effects-drawer",
+            "btn-toggle-presets",
+            "btn-toggle-effects",
+            "knob-floating-tooltip",
+        ):
+            self.assertIn(token, html_text, f"Token missing from served index.html: {token}")
+
+        # 2. Verify styles.css served contains skeuomorphic theme rules
+        status_css, _, css_raw = self._get(port, "/styles.css")
+        self.assertEqual(status_css, 200)
+        css_text = css_raw.decode("utf-8")
+        for rule in (
+            "pedal-svg-skeuo",
+            "rotary-knob-group",
+            "patch-cables-layer",
+            "amp-tolex",
+            "section-tabs",
+            "drawer-panel",
+            "pedal-theme-smart-signal",
+        ):
+            self.assertIn(rule, css_text, f"Rule missing from served styles.css: {rule}")
+
+        # 3. Verify app.js is served clean and offline
+        status_js, _, js_raw = self._get(port, "/app.js")
+        self.assertEqual(status_js, 200)
+        js_text = js_raw.decode("utf-8")
+        self.assertNotIn(".innerHTML", js_text)
+        self.assertNotIn("insertAdjacentHTML", js_text)
+
+    def test_review_findings_knob_wiring_and_drawer_sync(self) -> None:
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # [CRITICAL-1]: queueKnobChange is explicitly defined as a function
+        self.assertRegex(js_text, r"function\s+queueKnobChange\s*\(")
+        self.assertIn("scheduleKnobWrite", js_text)
+
+        # [IMPORTANT-1]: renderAll updates effects library when drawer is open
+        self.assertRegex(
+            js_text,
+            r'renderEffectsLibrary\(\);\s*\}\s*if\s*\(!els\["modal-backup"\]',
+        )
+
+        # [IMPORTANT-2]: knob.label fallback and formatKnobDisplay usage
+        self.assertIn("knob.label", js_text)
+        self.assertIn("formatKnobDisplay", js_text)
+
+        # [IMPORTANT-3]: data-cx and data-cy on rotary-knob-group, rotary-pointer-group target
+        self.assertIn('group.setAttribute("data-cx"', js_text)
+        self.assertIn('group.setAttribute("data-cy"', js_text)
+        self.assertIn(".rotary-pointer-group", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()

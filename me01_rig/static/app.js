@@ -84,6 +84,7 @@
     ports: [],
     presetsCache: [],
     selectedBlockId: 0,
+    currentTab: "pedalera",
     bankFilter: "all",
     searchTerm: "",
     factoryUnlocked: false,
@@ -130,6 +131,13 @@
       "error-banner",
       "error-banner-text",
       "btn-dismiss-error",
+      "presets-drawer",
+      "effects-drawer",
+      "btn-toggle-presets",
+      "btn-toggle-effects",
+      "btn-close-effects",
+      "effects-search",
+      "effects-categories-list",
       "preset-count-badge",
       "preset-search",
       "chk-unlock-factory",
@@ -140,7 +148,23 @@
       "pedalboard-stage",
       "pedalboard-empty",
       "pedalboard-chain",
+      "patch-cables-svg",
+      "knob-floating-tooltip",
       "pedal-cards-row",
+      "signal-flow-minimap",
+      "section-tabs",
+      "tab-pedalera",
+      "tab-pedales",
+      "tab-amp",
+      "tab-post-amp",
+      "amp-stage-view",
+      "amp-model-badge",
+      "amp-badge-text",
+      "amp-chicken-knobs",
+      "amp-jewel-lamp",
+      "amp-power-toggle",
+      "cab-badge-text",
+      "cab-knobs",
       "btn-move-earlier",
       "btn-move-later",
       "btn-parallel-unsupported",
@@ -419,7 +443,8 @@
       if (pointer) {
         const cx = pointer.getAttribute("data-cx");
         const cy = pointer.getAttribute("data-cy");
-        pointer.setAttribute("transform", `rotate(${deg.toFixed(1)} ${cx} ${cy})`);
+        const target = pointer.querySelector(".rotary-pointer-group") || pointer;
+        target.setAttribute("transform", `rotate(${deg.toFixed(1)} ${cx} ${cy})`);
       }
 
       if (refs.blockId === 3 && refs.slot === 0) {
@@ -498,6 +523,10 @@
         app.knobQueue.delete(addr);
       }
     }
+  }
+
+  function queueKnobChange(addr, rawValue, immediate = false) {
+    scheduleKnobWrite(addr, rawValue, immediate);
   }
 
   async function refreshPorts() {
@@ -1390,6 +1419,24 @@
     }
   }
 
+  function getPedalThemeClass(block) {
+    const name = (block.model_name || "").toLowerCase();
+    const bId = block.block_id;
+    if (bId === 0) {
+      if (name.includes("compress")) return "pedal-theme-silver-squeeze";
+      if (name.includes("boost") || name.includes("drive")) return "pedal-theme-blues-racer";
+      return "pedal-theme-smart-signal";
+    }
+    if (bId === 2) {
+      if (name.includes("phase")) return "pedal-theme-phase-91";
+      if (name.includes("flang")) return "pedal-theme-lightning-mistress";
+      return "pedal-theme-double-vision";
+    }
+    if (bId === 3) return "pedal-theme-digital-echo";
+    if (bId === 4) return "pedal-theme-reverb";
+    return "";
+  }
+
   function buildPedalSvg(block) {
     const spec = BLOCK_CATALOG[block.block_id];
     const tplId =
@@ -1397,11 +1444,23 @@
         ? "tpl-pedal-amp"
         : block.block_id === 5
           ? "tpl-pedal-cab"
-          : "tpl-pedal-stomp";
+          : els["tpl-pedal-skeuo"]
+            ? "tpl-pedal-skeuo"
+            : "tpl-pedal-stomp";
     const tpl = els[tplId];
     const svg = tpl.content.firstElementChild.cloneNode(true);
     const ns = svg.namespaceURI;
     const knobsLayer = svg.querySelector(".svg-knobs-layer");
+
+    const themeClass = getPedalThemeClass(block);
+    if (themeClass) {
+      svg.classList.add(themeClass);
+    }
+
+    const titleEl = svg.querySelector(".svg-pedal-title");
+    if (titleEl) {
+      titleEl.textContent = block.model_name || spec?.name || "";
+    }
 
     if (knobsLayer && block.block_id !== 5) {
       const knobs = block.knobs || [];
@@ -1411,6 +1470,30 @@
           const cy = 29;
           appendMiniKnobSvg(knobsLayer, ns, cx, cy, 6.2, knob.slot, knob.raw);
         });
+      } else if (tplId === "tpl-pedal-skeuo") {
+        const count = knobs.length;
+        if (count === 1) {
+          appendInteractiveKnobSvg(knobsLayer, ns, 65, 72, 13, knobs[0], block);
+        } else if (count === 2) {
+          appendInteractiveKnobSvg(knobsLayer, ns, 44, 72, 11, knobs[0], block);
+          appendInteractiveKnobSvg(knobsLayer, ns, 86, 72, 11, knobs[1], block);
+        } else if (count === 3) {
+          appendInteractiveKnobSvg(knobsLayer, ns, 34, 72, 9.5, knobs[0], block);
+          appendInteractiveKnobSvg(knobsLayer, ns, 65, 72, 9.5, knobs[1], block);
+          appendInteractiveKnobSvg(knobsLayer, ns, 96, 72, 9.5, knobs[2], block);
+        } else {
+          const topCount = count <= 4 ? 2 : 3;
+          knobs.forEach((knob, idx) => {
+            const isSecondRow = idx >= topCount;
+            const rowIndex = isSecondRow ? idx - topCount : idx;
+            const rowTotal = isSecondRow ? count - topCount : topCount;
+            const spacing = rowTotal === 1 ? 0 : rowTotal === 2 ? 40 : 31;
+            const startX = 65 - ((rowTotal - 1) * spacing) / 2;
+            const cx = startX + rowIndex * spacing;
+            const cy = isSecondRow ? 91 : 57;
+            appendInteractiveKnobSvg(knobsLayer, ns, cx, cy, 8.2, knob, block);
+          });
+        }
       } else {
         const count = knobs.length;
         const topCount = count <= 3 ? count : Math.ceil(count / 2);
@@ -1431,6 +1514,178 @@
       svg.style.setProperty("--block-color", spec.colorVar);
     }
     return svg;
+  }
+
+  function formatKnobValue(knob, raw) {
+    const val = clampInt(raw, 0, knob.max ?? 100);
+    if (!knob) return String(val);
+    if (knob.unit === "ms") return `${val * 10} ms`;
+    if (knob.unit === "Hz") return `${val * 2} Hz`;
+    if (knob.unit === "kHz") return `${(5.0 + (val / 100) * 13.0).toFixed(1)} kHz`;
+    if (knob.unit === "dB") return `${val - 50} dB`;
+    return `${val}`;
+  }
+
+  let tooltipHideTimer = null;
+
+  function showKnobTooltip(knobEl, label, formattedVal) {
+    if (tooltipHideTimer) {
+      clearTimeout(tooltipHideTimer);
+      tooltipHideTimer = null;
+    }
+    const tooltip = els["knob-floating-tooltip"];
+    if (!tooltip) return;
+    const rect = knobEl.getBoundingClientRect();
+    tooltip.style.left = `${rect.left + rect.width / 2}px`;
+    tooltip.style.top = `${rect.top}px`;
+    tooltip.replaceChildren();
+
+    const lblSpan = document.createElement("span");
+    lblSpan.className = "knob-tooltip-label";
+    lblSpan.textContent = label;
+
+    const valSpan = document.createElement("span");
+    valSpan.className = "knob-tooltip-val";
+    valSpan.textContent = formattedVal;
+
+    tooltip.append(lblSpan, valSpan);
+    tooltip.hidden = false;
+  }
+
+  function hideKnobTooltip() {
+    if (tooltipHideTimer) clearTimeout(tooltipHideTimer);
+    tooltipHideTimer = setTimeout(() => {
+      const tooltip = els["knob-floating-tooltip"];
+      if (tooltip) tooltip.hidden = true;
+    }, 120);
+  }
+
+  function updateKnobAngle(pointerGroup, cx, cy, raw, maxVal = 100) {
+    const deg = -135 + (clampInt(raw, 0, maxVal) / maxVal) * 270;
+    pointerGroup.setAttribute("transform", `rotate(${deg.toFixed(1)} ${cx} ${cy})`);
+  }
+
+  function appendInteractiveKnobSvg(layer, ns, cx, cy, radius, knob, block) {
+    const group = document.createElementNS(ns, "g");
+    group.setAttribute("class", "rotary-knob-group");
+    group.setAttribute("data-knob-slot", String(knob.slot));
+    group.setAttribute("data-knob-addr", String(knob.addr));
+    group.setAttribute("data-cx", String(cx));
+    group.setAttribute("data-cy", String(cy));
+
+    const knobLabel = knob.label || knob.name || "";
+
+    const dial = document.createElementNS(ns, "circle");
+    dial.setAttribute("cx", String(cx));
+    dial.setAttribute("cy", String(cy));
+    dial.setAttribute("r", String(radius));
+    dial.setAttribute("class", "rotary-dial");
+
+    const pointerGroup = document.createElementNS(ns, "g");
+    pointerGroup.setAttribute("class", "rotary-pointer-group");
+    const maxVal = knob.max ?? 100;
+    updateKnobAngle(pointerGroup, cx, cy, knob.raw, maxVal);
+
+    const notch = document.createElementNS(ns, "line");
+    notch.setAttribute("x1", String(cx));
+    notch.setAttribute("y1", String(cy));
+    notch.setAttribute("x2", String(cx));
+    notch.setAttribute("y2", String(cy - radius + 2));
+    notch.setAttribute("class", "rotary-notch");
+
+    const dot = document.createElementNS(ns, "circle");
+    dot.setAttribute("cx", String(cx));
+    dot.setAttribute("cy", String(cy - radius + 3));
+    dot.setAttribute("r", String(Math.max(1.0, radius * 0.12)));
+    dot.setAttribute("class", "rotary-dot");
+
+    pointerGroup.append(notch, dot);
+
+    const cap = document.createElementNS(ns, "circle");
+    cap.setAttribute("cx", String(cx));
+    cap.setAttribute("cy", String(cy));
+    cap.setAttribute("r", String(radius * 0.42));
+    cap.setAttribute("class", "rotary-knob-cap");
+
+    group.append(dial, pointerGroup, cap);
+
+    if (radius >= 8.5 && knobLabel) {
+      const lbl = document.createElementNS(ns, "text");
+      lbl.setAttribute("x", String(cx));
+      lbl.setAttribute("y", String(cy + radius + 7));
+      lbl.setAttribute("class", "rotary-knob-label");
+      lbl.textContent = knobLabel.slice(0, 5);
+      group.append(lbl);
+    }
+
+    const getTooltipDisplay = (raw) => {
+      if (block && typeof formatKnobDisplay === "function") {
+        return formatKnobDisplay(block.block_id, block.model_id, knob.slot, raw);
+      }
+      return formatKnobValue(knob, raw);
+    };
+
+    let isDragging = false;
+    let startY = 0;
+    let startVal = knob.raw;
+
+    group.addEventListener("pointerdown", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      isDragging = true;
+      startY = ev.clientY;
+      startVal = knob.raw;
+      group.setPointerCapture(ev.pointerId);
+      group.classList.add("is-active");
+      showKnobTooltip(group, knobLabel, getTooltipDisplay(knob.raw));
+    });
+
+    group.addEventListener("pointermove", (ev) => {
+      if (!isDragging) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+      const deltaY = startY - ev.clientY;
+      const nextVal = clampInt(Math.round(startVal + deltaY * 0.6), 0, maxVal);
+      if (nextVal !== knob.raw) {
+        knob.raw = nextVal;
+        updateKnobAngle(pointerGroup, cx, cy, nextVal, maxVal);
+        showKnobTooltip(group, knobLabel, getTooltipDisplay(nextVal));
+        queueKnobChange(knob.addr, nextVal);
+      }
+    });
+
+    const onPointerEnd = (ev) => {
+      if (!isDragging) return;
+      isDragging = false;
+      try {
+        group.releasePointerCapture(ev.pointerId);
+      } catch (_) {}
+      group.classList.remove("is-active");
+      hideKnobTooltip();
+      if (app.activeDragAddr === knob.addr) {
+        app.activeDragAddr = null;
+      }
+      queueKnobChange(knob.addr, knob.raw, true);
+    };
+
+    group.addEventListener("pointerup", onPointerEnd);
+    group.addEventListener("pointercancel", onPointerEnd);
+
+    group.addEventListener("wheel", (ev) => {
+      ev.preventDefault();
+      ev.stopPropagation();
+      const step = ev.deltaY < 0 ? 1 : -1;
+      const nextVal = clampInt(knob.raw + step, 0, maxVal);
+      if (nextVal !== knob.raw) {
+        knob.raw = nextVal;
+        updateKnobAngle(pointerGroup, cx, cy, nextVal, maxVal);
+        showKnobTooltip(group, knobLabel, getTooltipDisplay(nextVal));
+        queueKnobChange(knob.addr, nextVal, true);
+        hideKnobTooltip();
+      }
+    }, { passive: false });
+
+    layer.append(group);
   }
 
   function appendMiniKnobSvg(layer, ns, cx, cy, radius, slot, raw) {
@@ -1455,7 +1710,103 @@
     layer.append(circle, pointer);
   }
 
+  function setSectionTab(tabId) {
+    app.currentTab = tabId;
+    ["pedalera", "pedales", "amp", "post-amp"].forEach((id) => {
+      const btn = els[`tab-${id}`];
+      if (btn) {
+        const active = id === tabId;
+        btn.classList.toggle("is-active", active);
+        btn.setAttribute("aria-selected", String(active));
+      }
+    });
+
+    const isAmpView = tabId === "amp";
+    const boardPanel = document.querySelector(".pedalboard-panel");
+    if (boardPanel) {
+      boardPanel.hidden = isAmpView;
+    }
+    if (els["amp-stage-view"]) {
+      els["amp-stage-view"].hidden = !isAmpView;
+    }
+
+    if (isAmpView) {
+      renderAmpStage();
+    } else {
+      renderPedalboard();
+    }
+    renderSignalFlowMinimap();
+  }
+
+  function renderSignalFlowMinimap() {
+    const minimap = els["signal-flow-minimap"];
+    if (!minimap) return;
+    minimap.replaceChildren();
+
+    const ram = app.state?.ram;
+    if (!ram || !Array.isArray(ram.order)) return;
+
+    const inNode = document.createElement("span");
+    inNode.className = "minimap-node";
+    inNode.textContent = "IN";
+    minimap.appendChild(inNode);
+
+    const arrow1 = document.createElement("span");
+    arrow1.className = "minimap-arrow";
+    arrow1.textContent = "→";
+    minimap.appendChild(arrow1);
+
+    ram.order.forEach((blockId, idx) => {
+      const block = getBlockById(ram, blockId);
+      const spec = BLOCK_CATALOG[blockId];
+      if (!block || !spec) return;
+
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = `minimap-chip${blockId === app.selectedBlockId ? " is-selected" : ""}${block.enabled ? "" : " is-bypassed"}`;
+      chip.setAttribute("data-block-id", String(blockId));
+      chip.setAttribute("aria-label", `${block.name} ${block.model_name}`);
+
+      const led = document.createElement("span");
+      led.className = "minimap-led";
+
+      const txt = document.createElement("span");
+      txt.textContent = `${block.name}: ${block.model_name}`;
+
+      chip.append(led, txt);
+
+      chip.addEventListener("click", () => {
+        app.selectedBlockId = blockId;
+        if (app.currentTab === "amp" && blockId !== 1 && blockId !== 5) {
+          setSectionTab("pedalera");
+        } else if (app.currentTab === "pedales") {
+          const ampIdx = ram.order.indexOf(1);
+          if (idx >= ampIdx) setSectionTab("pedalera");
+        } else if (app.currentTab === "post-amp") {
+          const ampIdx = ram.order.indexOf(1);
+          if (idx <= ampIdx) setSectionTab("pedalera");
+        }
+        renderPedalboard();
+        renderInspector();
+        renderSignalFlowMinimap();
+      });
+
+      minimap.appendChild(chip);
+
+      const arrow = document.createElement("span");
+      arrow.className = "minimap-arrow";
+      arrow.textContent = "→";
+      minimap.appendChild(arrow);
+    });
+
+    const outNode = document.createElement("span");
+    outNode.className = "minimap-node";
+    outNode.textContent = "OUT";
+    minimap.appendChild(outNode);
+  }
+
   function renderPedalboard() {
+    renderSignalFlowMinimap();
     const ram = app.state?.ram;
     const hasRam = Boolean(ram && Array.isArray(ram.order));
     els["pedalboard-empty"].hidden = hasRam;
@@ -1482,7 +1833,10 @@
       activeEl instanceof Element && row.contains(activeEl) && activeEl.classList.contains("pedal-footswitch");
     row.replaceChildren();
 
+    const ampIdx = ram.order.indexOf(1);
     ram.order.forEach((blockId, chainIdx) => {
+      if (app.currentTab === "pedales" && chainIdx >= ampIdx) return;
+      if (app.currentTab === "post-amp" && chainIdx <= ampIdx) return;
       const block = getBlockById(ram, blockId);
       const spec = BLOCK_CATALOG[blockId];
       if (!block || !spec) return;
@@ -1624,6 +1978,143 @@
       const focusTarget = row.querySelector(targetSelector);
       if (focusTarget instanceof HTMLElement) {
         focusTarget.focus({ preventScroll: true });
+      }
+    }
+
+    window.requestAnimationFrame(() => {
+      renderPatchCables();
+    });
+  }
+
+  function renderPatchCables() {
+    const svg = els["patch-cables-svg"];
+    if (!svg) return;
+    svg.replaceChildren();
+
+    const ram = app.state?.ram;
+    if (!ram || !Array.isArray(ram.order) || els["pedalboard-chain"].hidden) return;
+
+    const row = els["pedal-cards-row"];
+    const cards = Array.from(row.querySelectorAll(".pedal-card"));
+    if (cards.length === 0) return;
+
+    const svgRect = svg.getBoundingClientRect();
+    if (svgRect.width === 0 || svgRect.height === 0) return;
+
+    const ns = svg.namespaceURI;
+
+    function getRelPoint(clientX, clientY) {
+      return {
+        x: clientX - svgRect.left,
+        y: clientY - svgRect.top,
+      };
+    }
+
+    for (let i = 0; i < cards.length - 1; i += 1) {
+      const cardA = cards[i];
+      const cardB = cards[i + 1];
+      const rectA = cardA.getBoundingClientRect();
+      const rectB = cardB.getBoundingClientRect();
+
+      const blockAId = Number(cardA.getAttribute("data-block-id"));
+      const blockBId = Number(cardB.getAttribute("data-block-id"));
+      const blockA = getBlockById(ram, blockAId);
+      const blockB = getBlockById(ram, blockBId);
+      const isDimmed = !(blockA?.enabled && blockB?.enabled);
+
+      const p1 = getRelPoint(rectA.right - 2, rectA.top + rectA.height * 0.54);
+      const p2 = getRelPoint(rectB.left + 2, rectB.top + rectB.height * 0.54);
+
+      const dx = p2.x - p1.x;
+      const slack = Math.min(36, Math.max(14, dx * 0.35));
+      const d = `M ${p1.x.toFixed(1)} ${p1.y.toFixed(1)} C ${(p1.x + dx * 0.45).toFixed(1)} ${(p1.y + slack).toFixed(1)}, ${(p2.x - dx * 0.45).toFixed(1)} ${(p2.y + slack).toFixed(1)}, ${p2.x.toFixed(1)} ${p2.y.toFixed(1)}`;
+
+      const group = document.createElementNS(ns, "g");
+      group.setAttribute("class", `patch-cable-group${isDimmed ? " patch-cable-dimmed" : ""}`);
+
+      const outerPath = document.createElementNS(ns, "path");
+      outerPath.setAttribute("class", "patch-cable-outer");
+      outerPath.setAttribute("d", d);
+
+      const innerPath = document.createElementNS(ns, "path");
+      innerPath.setAttribute("class", "patch-cable-inner");
+      innerPath.setAttribute("d", d);
+
+      group.append(outerPath, innerPath);
+      svg.appendChild(group);
+    }
+  }
+
+  function renderAmpStage() {
+    const stage = els["amp-stage-view"];
+    if (!stage) return;
+
+    const ram = app.state?.ram;
+    if (!ram || !Array.isArray(ram.blocks)) return;
+
+    const ampBlock = getBlockById(ram, 1);
+    const cabBlock = getBlockById(ram, 5);
+
+    if (ampBlock) {
+      if (els["amp-badge-text"]) {
+        els["amp-badge-text"].textContent = ampBlock.model_name || "VINTAGE TUBE AMP";
+      }
+      const isAmpOn = Boolean(ampBlock.enabled);
+      if (els["amp-jewel-lamp"]) {
+        els["amp-jewel-lamp"].classList.toggle("is-on", isAmpOn);
+      }
+      if (els["amp-power-toggle"]) {
+        els["amp-power-toggle"].classList.toggle("is-on", isAmpOn);
+        els["amp-power-toggle"].setAttribute("aria-pressed", String(isAmpOn));
+      }
+
+      const chickenContainer = els["amp-chicken-knobs"];
+      if (chickenContainer) {
+        chickenContainer.replaceChildren();
+        const svgNs = els["patch-cables-svg"] ? els["patch-cables-svg"].namespaceURI : null;
+        const svg = svgNs
+          ? document.createElementNS(svgNs, "svg")
+          : document.createElement("svg");
+        svg.setAttribute("viewBox", "0 0 340 68");
+        svg.setAttribute("class", "amp-knobs-svg");
+        svg.style.width = "100%";
+        svg.style.height = "68px";
+
+        const ns = svg.namespaceURI;
+        const knobs = ampBlock.knobs || [];
+        knobs.forEach((knob, idx) => {
+          const cx = 34 + idx * 68;
+          const cy = 34;
+          appendInteractiveKnobSvg(svg, ns, cx, cy, 18, knob, ampBlock);
+        });
+        chickenContainer.appendChild(svg);
+      }
+    }
+
+    if (cabBlock) {
+      if (els["cab-badge-text"]) {
+        els["cab-badge-text"].textContent = cabBlock.model_name || "LEKATO 4x12";
+      }
+      const cabKnobsContainer = els["cab-knobs"];
+      if (cabKnobsContainer) {
+        cabKnobsContainer.replaceChildren();
+        const svgNs = els["patch-cables-svg"] ? els["patch-cables-svg"].namespaceURI : null;
+        const cabSvg = svgNs
+          ? document.createElementNS(svgNs, "svg")
+          : document.createElement("svg");
+        cabSvg.setAttribute("viewBox", "0 0 240 68");
+        cabSvg.setAttribute("class", "cab-knobs-svg");
+        cabSvg.style.width = "100%";
+        cabSvg.style.height = "68px";
+
+        const ns = cabSvg.namespaceURI;
+        const knobs = cabBlock.knobs || [];
+        knobs.forEach((knob, idx) => {
+          const cx = 40 + idx * 80;
+          const cy = 34;
+          appendInteractiveKnobSvg(cabSvg, ns, cx, cy, 16, knob, cabBlock);
+        });
+        cabKnobsContainer.appendChild(cabSvg);
       }
     }
   }
@@ -1824,19 +2315,194 @@
     }
   }
 
+  function togglePresetsDrawer(forceState) {
+    const drawer = els["presets-drawer"];
+    if (!drawer) return;
+    const willOpen = typeof forceState === "boolean" ? forceState : !drawer.classList.contains("drawer-open");
+    drawer.classList.toggle("drawer-open", willOpen);
+    if (els["btn-toggle-presets"]) {
+      els["btn-toggle-presets"].classList.toggle("is-active", willOpen);
+    }
+    window.requestAnimationFrame(() => renderPatchCables());
+  }
+
+  function toggleEffectsDrawer(forceState) {
+    const drawer = els["effects-drawer"];
+    if (!drawer) return;
+    const willOpen = typeof forceState === "boolean" ? forceState : drawer.hidden;
+    drawer.hidden = !willOpen;
+    if (willOpen) {
+      renderEffectsLibrary();
+    }
+    if (els["btn-toggle-effects"]) {
+      els["btn-toggle-effects"].classList.toggle("is-active", willOpen);
+    }
+    window.requestAnimationFrame(() => renderPatchCables());
+  }
+
+  function renderEffectsLibrary() {
+    const container = els["effects-categories-list"];
+    if (!container) return;
+    container.replaceChildren();
+
+    const query = (els["effects-search"]?.value || "").trim().toLowerCase();
+    const ram = app.state?.ram;
+
+    const categories = [
+      {
+        id: "dinamica",
+        name: "Dinámica & Pre-effects",
+        blockId: 0,
+        color: "var(--block-fx)",
+        models: getModelListForBlock(0, app.state),
+      },
+      {
+        id: "drive-amp",
+        name: "Preamps & Amps",
+        blockId: 1,
+        color: "var(--block-amp)",
+        models: getModelListForBlock(1, app.state),
+      },
+      {
+        id: "modulacion",
+        name: "Modulación",
+        blockId: 2,
+        color: "var(--block-mod)",
+        models: getModelListForBlock(2, app.state),
+      },
+      {
+        id: "delay",
+        name: "Delay",
+        blockId: 3,
+        color: "var(--block-dly)",
+        models: getModelListForBlock(3, app.state),
+      },
+      {
+        id: "reverb",
+        name: "Reverb",
+        blockId: 4,
+        color: "var(--block-rev)",
+        models: getModelListForBlock(4, app.state),
+      },
+      {
+        id: "cab",
+        name: "Cabinets & IRs",
+        blockId: 5,
+        color: "var(--block-cab)",
+        models: getModelListForBlock(5, app.state),
+      },
+    ];
+
+    categories.forEach((cat) => {
+      const filtered = cat.models.filter((m) => {
+        if (!query) return true;
+        return m.name.toLowerCase().includes(query) || cat.name.toLowerCase().includes(query);
+      });
+
+      if (query && filtered.length === 0) return;
+
+      const catEl = document.createElement("div");
+      catEl.className = "effects-category is-open";
+
+      const header = document.createElement("div");
+      header.className = "effects-category-header";
+
+      const title = document.createElement("span");
+      title.textContent = `${cat.name} (${filtered.length})`;
+
+      const chevron = document.createElement("span");
+      chevron.className = "effects-category-chevron";
+      chevron.textContent = "▶";
+
+      header.append(title, chevron);
+      header.addEventListener("click", () => {
+        catEl.classList.toggle("is-open");
+      });
+
+      const grid = document.createElement("div");
+      grid.className = "effects-grid";
+
+      const currentBlock = ram ? getBlockById(ram, cat.blockId) : null;
+
+      filtered.forEach((model) => {
+        const isCurrent = currentBlock?.model_id === model.id;
+        const tile = document.createElement("button");
+        tile.type = "button";
+        tile.className = `effect-card-tile${isCurrent ? " is-active" : ""}`;
+        tile.style.setProperty("--tile-color", cat.color);
+
+        const icon = document.createElement("span");
+        icon.className = "effect-tile-icon";
+
+        const nameSpan = document.createElement("span");
+        nameSpan.className = "effect-tile-name";
+        nameSpan.textContent = model.name;
+
+        tile.append(icon, nameSpan);
+
+        if (model.minFw) {
+          const badge = document.createElement("span");
+          badge.className = "effect-tile-badge";
+          badge.textContent = `V${model.minFw}+`;
+          tile.appendChild(badge);
+        }
+
+        tile.addEventListener("click", () => {
+          app.selectedBlockId = cat.blockId;
+          void handleChangeModel(cat.blockId, model.id);
+          renderEffectsLibrary();
+        });
+
+        grid.appendChild(tile);
+      });
+
+      catEl.append(header, grid);
+      container.appendChild(catEl);
+    });
+  }
+
   function renderAll() {
     renderPorts();
     renderTopBar();
     renderBackupNote();
     renderSidebar();
     renderPedalboard();
+    renderAmpStage();
     renderInspector();
+    if (els["effects-drawer"] && !els["effects-drawer"].hidden) {
+      renderEffectsLibrary();
+    }
     if (!els["modal-backup"].hidden) {
       updateBackupRestoreButtons();
     }
   }
 
   function bindEvents() {
+    ["pedalera", "pedales", "amp", "post-amp"].forEach((tabId) => {
+      const btn = els[`tab-${tabId}`];
+      if (btn) {
+        btn.addEventListener("click", () => {
+          setSectionTab(tabId);
+        });
+      }
+    });
+    if (els["amp-power-toggle"]) {
+      els["amp-power-toggle"].addEventListener("click", () => {
+        const ampBlock = getBlockById(app.state?.ram, 1);
+        if (ampBlock) {
+          void handleToggleBlock(1, !ampBlock.enabled);
+        }
+      });
+    }
+    if (els["amp-jewel-lamp"]) {
+      els["amp-jewel-lamp"].addEventListener("click", () => {
+        const ampBlock = getBlockById(app.state?.ram, 1);
+        if (ampBlock) {
+          void handleToggleBlock(1, !ampBlock.enabled);
+        }
+      });
+    }
+
     els["btn-refresh-ports"].addEventListener("click", () => {
       void refreshPorts();
     });
@@ -1957,6 +2623,15 @@
     window.addEventListener("pointerup", clearDragState);
     window.addEventListener("touchend", clearDragState, { passive: true });
 
+    if (typeof ResizeObserver !== "undefined" && els["pedalboard-stage"]) {
+      const stageObserver = new ResizeObserver(() => {
+        window.requestAnimationFrame(() => {
+          renderPatchCables();
+        });
+      });
+      stageObserver.observe(els["pedalboard-stage"]);
+    }
+
     // Bank tabs & search & factory lock
     document.querySelectorAll(".bank-tab").forEach((tab) => {
       tab.addEventListener("click", () => {
@@ -2025,6 +2700,19 @@
     });
 
     // Modal close handlers
+    if (els["btn-toggle-presets"]) {
+      els["btn-toggle-presets"].addEventListener("click", () => togglePresetsDrawer());
+    }
+    if (els["btn-toggle-effects"]) {
+      els["btn-toggle-effects"].addEventListener("click", () => toggleEffectsDrawer());
+    }
+    if (els["btn-close-effects"]) {
+      els["btn-close-effects"].addEventListener("click", () => toggleEffectsDrawer(false));
+    }
+    if (els["effects-search"]) {
+      els["effects-search"].addEventListener("input", () => renderEffectsLibrary());
+    }
+
     document.querySelectorAll("[data-close-modal]").forEach((btn) => {
       btn.addEventListener("click", () => {
         closeModal(btn.getAttribute("data-close-modal"));
@@ -2038,10 +2726,28 @@
       });
     });
     document.addEventListener("keydown", (ev) => {
+      if (ev.target instanceof Element && ev.target.closest("input, select, textarea")) {
+        if (ev.key === "Escape") {
+          ev.target.blur();
+        }
+        return;
+      }
       if (ev.key === "Escape") {
         ["modal-save", "modal-revert", "modal-backup"].forEach((id) => {
           if (!els[id].hidden) closeModal(id);
         });
+        if (els["effects-drawer"] && !els["effects-drawer"].hidden) {
+          toggleEffectsDrawer(false);
+        }
+        if (els["presets-drawer"] && els["presets-drawer"].classList.contains("drawer-open")) {
+          togglePresetsDrawer(false);
+        }
+      } else if (ev.key === "p" || ev.key === "P") {
+        ev.preventDefault();
+        togglePresetsDrawer();
+      } else if (ev.key === "e" || ev.key === "E") {
+        ev.preventDefault();
+        toggleEffectsDrawer();
       }
     });
   }

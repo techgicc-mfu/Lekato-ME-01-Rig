@@ -971,6 +971,815 @@ body {
   fill: #9ca3af;
 }
 
+/* ==========================================================================
+   UltraRig Skeuomorphic Stompbox Styles & Theme Engine
+   ========================================================================== */
+
+.pedal-svg-skeuo {
+  width: 120px;
+  height: 175px;
+  filter: drop-shadow(0 12px 24px rgba(0, 0, 0, 0.65));
+  transition: transform 140ms ease, filter 140ms ease;
+}
+
+.pedal-card:hover .pedal-svg-skeuo {
+  transform: translateY(-3px) scale(1.02);
+  filter: drop-shadow(0 16px 30px rgba(0, 0, 0, 0.75));
+}
+
+.svg-chassis-shadow {
+  fill: rgba(0, 0, 0, 0.45);
+}
+
+.svg-chassis-bevel {
+  fill: #334155;
+  stroke: rgba(255, 255, 255, 0.12);
+  stroke-width: 1;
+}
+
+.svg-chassis-body {
+  fill: var(--pedal-chassis-fill, #1e293b);
+  stroke: rgba(0, 0, 0, 0.6);
+  stroke-width: 1.5;
+}
+
+.svg-chassis-screw {
+  fill: url(#screw-metal-grad);
+  stroke: #1e293b;
+  stroke-width: 0.6;
+}
+
+.svg-jack-left,
+.svg-jack-right {
+  fill: #64748b;
+  stroke: #0f172a;
+  stroke-width: 0.8;
+}
+
+.svg-pedal-title {
+  font-family: var(--font-display);
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  fill: var(--pedal-title-color, #f8fafc);
+  text-transform: uppercase;
+}
+
+/* Footswitch hardware */
+.svg-switch-ring {
+  fill: #475569;
+  stroke: #0f172a;
+  stroke-width: 1.2;
+}
+
+.svg-switch-nut {
+  fill: url(#switch-chrome-grad);
+  stroke: #334155;
+  stroke-width: 0.8;
+}
+
+.svg-switch-plunger {
+  fill: #94a3b8;
+  stroke: #1e293b;
+  stroke-width: 0.8;
+  transition: transform 90ms ease, fill 90ms ease;
+}
+
+.pedal-card:active .svg-switch-plunger {
+  transform: scale(0.92);
+  fill: #64748b;
+}
+
+/* LED Jewel */
+.svg-led-jewel {
+  fill: #334155;
+  stroke: #0f172a;
+  stroke-width: 0.6;
+  transition: fill 150ms ease;
+}
+
+.svg-led-halo {
+  fill: var(--pedal-led-color, #ef4444);
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+
+.pedal-card:not(.is-bypassed) .svg-led-jewel {
+  fill: var(--pedal-led-color, #ef4444);
+  filter: drop-shadow(0 0 5px var(--pedal-led-color, #ef4444));
+}
+
+.pedal-card:not(.is-bypassed) .svg-led-halo {
+  opacity: 0.85;
+}
+
+/* --------------------------------------------------------------------------
+   Model-Specific Skeuomorphic Themes
+   -------------------------------------------------------------------------- */
+
+/* 1. Smart Signal (Noise Gate) */
+.pedal-theme-smart-signal .svg-chassis-bevel { fill: #064e3b; }
+.pedal-theme-smart-signal .svg-chassis-body { fill: #065f46; }
+.pedal-theme-smart-signal .svg-faceplate { fill: #042f2e; stroke: #34d399; stroke-width: 0.8; }
+.pedal-theme-smart-signal { --pedal-led-color: #ef4444; --pedal-title-color: #a7f3d0; }
+
+/* 2. Silver Squeeze (Compressor) */
+.pedal-theme-silver-squeeze .svg-chassis-bevel { fill: #94a3b8; }
+.pedal-theme-silver-squeeze .svg-chassis-body { fill: #cbd5e1; }
+.pedal-theme-silver-squeeze .svg-faceplate { fill: #e2e8f0; stroke: #475569; stroke-width: 0.8; }
+.pedal-theme-silver-squeeze { --pedal-led-color: #ef4444; --pedal-title-color: #0f172a; }
+
+/* 3. Blues Racer (Boost / Overdrive) */
+.pedal-theme-blues-racer .svg-chassis-bevel { fill: #1e3a8a; }
+.pedal-theme-blues-racer .svg-chassis-body { fill: #1d4ed8; }
+.pedal-theme-blues-racer .svg-faceplate { fill: #172554; stroke: #60a5fa; stroke-width: 0.8; }
+.pedal-theme-blues-racer { --pedal-led-color: #f59e0b; --pedal-title-color: #bfdbfe; }
+
+/* 4. Phase 91 (Phaser) */
+.pedal-theme-phase-91 .svg-chassis-bevel { fill: #9a3412; }
+.pedal-theme-phase-91 .svg-chassis-body { fill: #ea580c; }
+.pedal-theme-phase-91 .svg-faceplate { fill: #7c2d12; stroke: #fdba74; stroke-width: 0.8; }
+.pedal-theme-phase-91 { --pedal-led-color: #ef4444; --pedal-title-color: #ffedd5; }
+
+/* 5. Double Vision (Chorus) */
+.pedal-theme-double-vision .svg-chassis-bevel { fill: #581c87; }
+.pedal-theme-double-vision .svg-chassis-body { fill: #7e22ce; }
+.pedal-theme-double-vision .svg-faceplate { fill: #3b0764; stroke: #c084fc; stroke-width: 0.8; }
+.pedal-theme-double-vision { --pedal-led-color: #00e5ff; --pedal-title-color: #f3e8ff; }
+
+/* 6. Lightning Mistress (Flanger) */
+.pedal-theme-lightning-mistress .svg-chassis-bevel { fill: #3f6212; }
+.pedal-theme-lightning-mistress .svg-chassis-body { fill: #65a30d; }
+.pedal-theme-lightning-mistress .svg-faceplate { fill: #1a2e05; stroke: #bef264; stroke-width: 0.8; }
+.pedal-theme-lightning-mistress { --pedal-led-color: #a3e635; --pedal-title-color: #ecfccb; }
+
+/* 7. Digital Echo (Delay) */
+.pedal-theme-digital-echo .svg-chassis-bevel { fill: #0f172a; }
+.pedal-theme-digital-echo .svg-chassis-body { fill: #1e293b; }
+.pedal-theme-digital-echo .svg-faceplate { fill: #090d16; stroke: #38bdf8; stroke-width: 0.8; }
+.pedal-theme-digital-echo { --pedal-led-color: #38bdf8; --pedal-title-color: #e0f2fe; }
+
+/* Generic Category Theme fallbacks */
+.pedal-theme-gate .svg-chassis-body { fill: #065f46; }
+.pedal-theme-compressor .svg-chassis-body { fill: #cbd5e1; }
+.pedal-theme-drive .svg-chassis-body { fill: #b45309; }
+.pedal-theme-mod .svg-chassis-body { fill: #6d28d9; }
+.pedal-theme-delay .svg-chassis-body { fill: #0369a1; }
+.pedal-theme-reverb .svg-chassis-body { fill: #0f766e; }
+
+/* --------------------------------------------------------------------------
+   Interactive Rotary Knobs & Floating Tooltip
+   -------------------------------------------------------------------------- */
+
+.rotary-knob-group {
+  cursor: ns-resize;
+  user-select: none;
+  touch-action: none;
+}
+
+.rotary-dial {
+  fill: #13171c;
+  stroke: #475569;
+  stroke-width: 1.2;
+  transition: stroke 120ms ease;
+}
+
+.rotary-knob-group:hover .rotary-dial,
+.rotary-knob-group.is-active .rotary-dial {
+  stroke: var(--accent-cyan, #00e5ff);
+  filter: drop-shadow(0 0 4px rgba(0, 229, 255, 0.45));
+}
+
+.rotary-notch {
+  stroke: #f8fafc;
+  stroke-width: 2.2;
+  stroke-linecap: round;
+}
+
+.rotary-dot {
+  fill: var(--accent-cyan, #00e5ff);
+}
+
+.rotary-knob-cap {
+  fill: #334155;
+  stroke: #1e293b;
+  stroke-width: 0.6;
+}
+
+.rotary-knob-label {
+  font-family: var(--font-ui);
+  font-size: 6.5px;
+  font-weight: 700;
+  fill: #94a3b8;
+  text-anchor: middle;
+  pointer-events: none;
+  letter-spacing: 0.3px;
+  text-transform: uppercase;
+}
+
+.knob-floating-tooltip {
+  position: fixed;
+  z-index: 9999;
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(13, 15, 18, 0.94);
+  border: 1px solid var(--accent-cyan);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.6), 0 0 10px rgba(0, 229, 255, 0.25);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 700;
+  pointer-events: none;
+  transform: translate(-50%, -100%);
+  margin-top: -10px;
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+}
+
+.knob-tooltip-label {
+  color: #94a3b8;
+  font-size: 10px;
+  margin-right: 6px;
+  font-family: var(--font-ui);
+  text-transform: uppercase;
+}
+
+.knob-tooltip-val {
+  color: var(--accent-cyan);
+}
+
+/* --------------------------------------------------------------------------
+   Dynamic Curved Patch Cables Engine
+   -------------------------------------------------------------------------- */
+
+.patch-cables-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+  overflow: visible;
+}
+
+.patch-cable-group {
+  transition: opacity 160ms ease;
+}
+
+.patch-cable-outer {
+  fill: none;
+  stroke: #121519;
+  stroke-width: 7px;
+  stroke-linecap: round;
+  filter: drop-shadow(0 5px 9px rgba(0, 0, 0, 0.75));
+}
+
+.patch-cable-inner {
+  fill: none;
+  stroke: #384252;
+  stroke-width: 2px;
+  stroke-linecap: round;
+  opacity: 0.75;
+}
+
+.patch-cable-jack {
+  fill: #94a3b8;
+  stroke: #1e293b;
+  stroke-width: 1px;
+}
+
+.patch-cable-dimmed,
+.patch-cable-group.patch-cable-dimmed {
+  opacity: 0.28;
+  filter: grayscale(0.85);
+}
+
+/* --------------------------------------------------------------------------
+   Photorealistic Amp Head & Stacked Cabinet Stage
+   -------------------------------------------------------------------------- */
+
+.amp-stage-view {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 8px;
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.amp-tolex {
+  background:
+    radial-gradient(circle at 50% 30%, rgba(255, 255, 255, 0.05) 0%, transparent 70%),
+    repeating-linear-gradient(45deg, #18191c 0, #18191c 2px, #121315 2px, #121315 4px),
+    #111214;
+  border: 14px solid #0d0e10;
+  border-radius: 14px;
+  box-shadow:
+    0 24px 50px rgba(0, 0, 0, 0.88),
+    inset 0 0 12px rgba(0, 0, 0, 0.95),
+    inset 0 1px 3px rgba(255, 255, 255, 0.15);
+  position: relative;
+  overflow: hidden;
+}
+
+.amp-head-enclosure {
+  width: 100%;
+  padding: 24px 20px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+}
+
+.amp-head-piping,
+.cab-piping {
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  border: 2px solid #e2e8f0;
+  border-radius: 8px;
+  pointer-events: none;
+  opacity: 0.75;
+  box-shadow: inset 0 0 4px rgba(0, 0, 0, 0.6);
+}
+
+.corner-bracket {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #94a3b8;
+  pointer-events: none;
+  z-index: 3;
+}
+
+.corner-bracket.top-left { top: 6px; left: 6px; border-right: none; border-bottom: none; border-top-left-radius: 6px; }
+.corner-bracket.top-right { top: 6px; right: 6px; border-left: none; border-bottom: none; border-top-right-radius: 6px; }
+.corner-bracket.bottom-left { bottom: 6px; left: 6px; border-right: none; border-top: none; border-bottom-left-radius: 6px; }
+.corner-bracket.bottom-right { bottom: 6px; right: 6px; border-left: none; border-top: none; border-bottom-right-radius: 6px; }
+
+.amp-model-badge-wrap {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.amp-model-badge {
+  padding: 8px 32px;
+  background: #090a0c;
+  border: 2px solid #f8fafc;
+  border-radius: 4px;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.8), inset 0 0 8px rgba(0, 0, 0, 0.9);
+}
+
+.amp-badge-text {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 2.5px;
+  color: #f8fafc;
+  text-transform: uppercase;
+}
+
+.amp-faceplate {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, #e2e8f0 0%, #cbd5e1 45%, #94a3b8 75%, #64748b 100%);
+  border: 2px solid #334155;
+  border-radius: 6px;
+  box-shadow: inset 0 1px 3px rgba(255, 255, 255, 0.8), 0 8px 20px rgba(0, 0, 0, 0.6);
+}
+
+.amp-jack-cluster {
+  display: flex;
+  align-items: center;
+}
+
+.amp-input-jack {
+  display: inline-block;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 40%, #94a3b8 0%, #334155 70%, #0f172a 100%);
+  border: 2px solid #64748b;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.8);
+  position: relative;
+}
+
+.amp-input-jack::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #050505;
+}
+
+.amp-chicken-knobs,
+.cab-knobs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  flex: 1;
+}
+
+.amp-controls-cluster {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.amp-jewel-lamp {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #ff7b72 0%, #b91c1c 65%, #450a0a 100%);
+  border: 2px solid #64748b;
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.85);
+  transition: all 180ms ease;
+  cursor: pointer;
+}
+
+.amp-jewel-lamp:not(.is-on) {
+  background: #450a0a;
+  box-shadow: none;
+  filter: brightness(0.4);
+}
+
+.amp-power-toggle {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.toggle-bat {
+  display: inline-block;
+  width: 8px;
+  height: 22px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f8fafc 0%, #94a3b8 50%, #475569 100%);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  transition: transform 120ms ease;
+}
+
+.amp-power-toggle.is-on .toggle-bat {
+  transform: translateY(-3px);
+}
+
+.amp-power-toggle:not(.is-on) .toggle-bat {
+  transform: translateY(3px) rotate(15deg);
+  filter: brightness(0.7);
+}
+
+.toggle-label {
+  font-family: var(--font-ui);
+  font-size: 8px;
+  font-weight: 800;
+  color: #1e293b;
+  letter-spacing: 0.5px;
+}
+
+/* Stacked Speaker Cabinet */
+.cab-enclosure {
+  width: 100%;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.cab-grille-cloth {
+  width: 100%;
+  height: 140px;
+  background:
+    repeating-linear-gradient(45deg, #1c1d22 0, #1c1d22 3px, #121316 3px, #121316 6px),
+    #15161a;
+  border: 2px solid #334155;
+  border-radius: 6px;
+  box-shadow: inset 0 0 16px rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cab-badge {
+  padding: 6px 20px;
+  background: rgba(15, 17, 21, 0.88);
+  border: 1px solid #94a3b8;
+  border-radius: 3px;
+}
+
+.cab-badge-text {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #e2e8f0;
+}
+
+.cab-control-strip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 14px;
+  background: #181b20;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+/* --------------------------------------------------------------------------
+   Section Navigation Tabs & Top Signal Flow Minimap
+   -------------------------------------------------------------------------- */
+
+.signal-flow-minimap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 5px 14px;
+  background: rgba(16, 18, 22, 0.88);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  width: fit-content;
+  margin: 2px auto 10px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.minimap-node {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: var(--font-display);
+  font-size: 11px;
+  color: var(--text-secondary);
+}
+
+.minimap-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  background: #1a1e24;
+  border: 1px solid #2d333e;
+  color: var(--text-primary);
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 120ms ease;
+  user-select: none;
+}
+
+.minimap-chip:hover {
+  border-color: var(--accent-cyan);
+  background: #232932;
+  transform: translateY(-1px);
+}
+
+.minimap-chip.is-selected {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.15);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
+}
+
+.minimap-chip.is-bypassed {
+  opacity: 0.52;
+}
+
+.minimap-led {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  box-shadow: 0 0 5px rgba(34, 197, 94, 0.8);
+}
+
+.minimap-chip.is-bypassed .minimap-led {
+  background: #64748b;
+  box-shadow: none;
+}
+
+.minimap-arrow {
+  color: #475569;
+  font-size: 10px;
+  user-select: none;
+}
+
+.section-tabs {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin: 0 auto 12px;
+}
+
+.section-tab {
+  padding: 5px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: #14171c;
+  color: var(--text-secondary);
+  font-family: var(--font-ui);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 140ms ease;
+  user-select: none;
+}
+
+.section-tab:hover {
+  border-color: var(--border-bright);
+  color: var(--text-primary);
+  background: #1c2026;
+}
+
+.section-tab.is-active {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.14);
+  color: var(--accent-cyan);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.22);
+}
+
+/* --------------------------------------------------------------------------
+   Effects Library Drawer & Collapsible Presets Drawer
+   -------------------------------------------------------------------------- */
+
+.drawer-panel {
+  transition: transform 240ms cubic-bezier(0.16, 1, 0.3, 1), opacity 180ms ease;
+  z-index: 10;
+}
+
+.drawer-panel.drawer-left:not(.drawer-open) {
+  display: none !important;
+}
+
+.drawer-panel.drawer-right {
+  width: 320px;
+  min-width: 320px;
+  background: #14171c;
+  border-left: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow-y: auto;
+  box-shadow: -8px 0 24px rgba(0, 0, 0, 0.6);
+}
+
+.drawer-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.drawer-search-wrap {
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.effects-categories-list {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 10px;
+  gap: 10px;
+}
+
+.effects-category {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #181c22;
+  overflow: hidden;
+}
+
+.effects-category-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 12px;
+  background: #1d2128;
+  cursor: pointer;
+  user-select: none;
+  font-family: var(--font-display);
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-primary);
+  border-bottom: 1px solid transparent;
+}
+
+.effects-category.is-open .effects-category-header {
+  border-bottom-color: var(--border);
+}
+
+.effects-category-chevron {
+  font-size: 10px;
+  color: var(--text-muted);
+  transition: transform 140ms ease;
+}
+
+.effects-category.is-open .effects-category-chevron {
+  transform: rotate(90deg);
+}
+
+.effects-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+
+.effects-category:not(.is-open) .effects-grid {
+  display: none;
+}
+
+.effect-card-tile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 6px;
+  border-radius: 7px;
+  background: #14171c;
+  border: 1px solid #2a313d;
+  cursor: pointer;
+  transition: all 120ms ease;
+  text-align: center;
+  user-select: none;
+}
+
+.effect-card-tile:hover {
+  border-color: var(--accent-cyan);
+  background: #1e242d;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.effect-card-tile.is-active {
+  border-color: var(--accent-cyan);
+  background: rgba(0, 229, 255, 0.14);
+  box-shadow: 0 0 10px rgba(0, 229, 255, 0.22);
+}
+
+.effect-tile-icon {
+  width: 32px;
+  height: 44px;
+  border-radius: 4px;
+  background: var(--tile-color, #38bdf8);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.5);
+  position: relative;
+}
+
+.effect-tile-icon::after {
+  content: "";
+  position: absolute;
+  top: 6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #0f172a;
+}
+
+.effect-tile-name {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.effect-tile-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1px 4px;
+  border-radius: 3px;
+  background: var(--accent-gold-dim);
+  color: var(--accent-gold);
+}
+
 /* AMP head SVG colors */
 .svg-amp-cabinet {
   fill: #2d2219;
