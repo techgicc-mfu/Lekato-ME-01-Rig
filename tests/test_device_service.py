@@ -53,8 +53,8 @@ class FakeTransport:
         self.slots = [bytearray.fromhex(h) for h in fixture_data["presets_hex"]]
 
         vectors = fixture_data["captured_vectors"]
-        self.amps_table = bytes(parse_frame(unwrap_sysex(bytes.fromhex(vectors["amps_raw"]))).data)
-        self.cabs_table = bytes(parse_frame(unwrap_sysex(bytes.fromhex(vectors["cabs_raw"]))).data)
+        self.amps_table = bytearray(parse_frame(unwrap_sysex(bytes.fromhex(vectors["amps_raw"]))).data)
+        self.cabs_table = bytearray(parse_frame(unwrap_sysex(bytes.fromhex(vectors["cabs_raw"]))).data)
 
         self.write_log: list[tuple[int, bytes, int]] = []
         self.read_log: list[tuple[int, int, int]] = []
@@ -127,6 +127,17 @@ class FakeTransport:
         raise ProtocolError(f"Unexpected read: space=0x{space:02x}, addr=0x{addr:08x}, size={size}")
 
     def _handle_write(self, space: int, addr: int, data: bytes, timeout_ms: int) -> None:
+        if space == SPACE_NAMES:
+            if ADDR_AMP_NAMES <= addr < ADDR_AMP_NAMES + NAME_TABLE_SIZE:
+                offset = addr - ADDR_AMP_NAMES
+                self.amps_table[offset : offset + len(data)] = data
+                return
+            if ADDR_CAB_NAMES <= addr < ADDR_CAB_NAMES + NAME_TABLE_SIZE:
+                offset = addr - ADDR_CAB_NAMES
+                self.cabs_table[offset : offset + len(data)] = data
+                return
+            raise ProtocolError(f"Unexpected name table write: addr=0x{addr:08x}")
+
         if space != SPACE_PRESET:
             raise ProtocolError(f"Unexpected write space: 0x{space:02x}")
 
@@ -552,6 +563,73 @@ class DeviceServiceTests(unittest.TestCase):
         svc.disconnect()
         self.assertFalse(svc.get_state()["connected"])
         self.assertGreaterEqual(transport.closed_count, 1)
+
+    def test_rename_slot_and_audition(self) -> None:
+        svc = self._make_service()
+        svc.enter_demo_mode()
+        self.addCleanup(svc.disconnect)
+
+        # 1. Demo mode rename AMP slot 0
+        res_amp = svc.rename_slot("amp", 0, "TS9 Clean")
+        self.assertTrue(res_amp["ok"])
+        self.assertEqual(res_amp["name"], "TS9 Clean")
+        self.assertEqual(svc.get_state()["amps"][0], "TS9 Clean")
+
+        # 2. Demo mode rename CAB slot 3
+        res_cab = svc.rename_slot("cab", 3, "Mesa 4x12 V30")
+        self.assertTrue(res_cab["ok"])
+        self.assertEqual(svc.get_state()["cabs"][3], "Mesa 4x12 V30")
+
+        # 3. Audition AMP slot 4
+        res_aud_amp = svc.audition_slot("amp", 4)
+        self.assertTrue(res_aud_amp["ok"])
+        st = svc.get_state()
+        amp_block = next(b for b in st["ram"]["blocks"] if b["block_id"] == 1)
+        self.assertEqual(amp_block["model_id"], 4)
+        self.assertTrue(amp_block["enabled"])
+
+        # 4. Audition CAB slot 2
+        res_aud_cab = svc.audition_slot("cab", 2)
+        self.assertTrue(res_aud_cab["ok"])
+        st = svc.get_state()
+        cab_block = next(b for b in st["ram"]["blocks"] if b["block_id"] == 5)
+        self.assertEqual(cab_block["model_id"], 2)
+        self.assertTrue(cab_block["enabled"])
+
+        # 5. Connected mode rename writes to transport and re-reads
+        svc.disconnect()
+        svc.connect(auto_backup=False, start_polling=False)
+        transport = self.transports[-1]
+
+        res_conn = svc.rename_slot("amp", 2, "JCM800 Mod")
+        self.assertTrue(res_conn["ok"])
+        self.assertEqual(svc.get_state()["amps"][2], "JCM800 Mod")
+        self.assertIn(b"JCM800 Mod", bytes(transport.amps_table))
+
+        # 6. Error handling
+        with self.assertRaises(ProtocolError):
+            svc.rename_slot("invalid_cat", 0, "Name")
+        with self.assertRaises(ProtocolError):
+            svc.rename_slot("amp", 25, "Name")
+        with self.assertRaises(ProtocolError):
+            svc.audition_slot("dly", 0)
+
+    def test_get_capture_library(self) -> None:
+        svc = self._make_service()
+        lib = svc.get_curated_library()
+        self.assertIn("categories", lib)
+        cats = {c["id"]: c for c in lib["categories"]}
+        self.assertIn("overdrives", cats)
+        self.assertIn("clean", cats)
+        self.assertIn("crunch", cats)
+        self.assertIn("highgain", cats)
+        self.assertIn("bass", cats)
+        self.assertIn("cabinets", cats)
+
+        # Check that overdrive models exist
+        od_names = [m["name"] for m in cats["overdrives"]["models"]]
+        self.assertTrue(any("TS" in name or "Screamer" in name for name in od_names))
+        self.assertTrue(any("RAT" in name for name in od_names))
 
 
 if __name__ == "__main__":

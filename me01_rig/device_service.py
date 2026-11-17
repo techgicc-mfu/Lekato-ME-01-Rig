@@ -22,6 +22,7 @@ from .protocol import (
     CMD_IDENTITY,
     CMD_READ,
     FACTORY_SLOT_COUNT,
+    NAME_RECORD_COUNT,
     NAME_TABLE_SIZE,
     PRESET_SIZE,
     SPACE_NAMES,
@@ -35,6 +36,7 @@ from .protocol import (
     build_identity_query,
     build_load_preset,
     build_read_request,
+    build_rename_slot,
     build_save_flash,
     build_toggle_block,
     decode_name_table,
@@ -69,6 +71,14 @@ def _require_slot_id(value: Any, name: str = "preset_id") -> int:
         raise ProtocolError(f"{name} must be an int, got {type(value).__name__}")
     if not (0 <= value < TOTAL_PRESET_SLOTS):
         raise ProtocolError(f"{name} out of range [0, {TOTAL_PRESET_SLOTS - 1}]: {value}")
+    return value
+
+
+def _require_range(value: Any, low: int, high: int, name: str) -> int:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ProtocolError(f"{name} must be an int, got {type(value).__name__}")
+    if not (low <= value <= high):
+        raise ProtocolError(f"{name} out of range [{low}, {high}]: {value}")
     return value
 
 
@@ -808,6 +818,347 @@ class DeviceService:
                 "backup_path": backup_path,
                 "verified": True,
             }
+
+    def rename_slot(self, category: str, slot: int, name: str) -> dict[str, Any]:
+        """Rename an AMP (0x90000000) or CAB (0x80000000) slot in device flash memory."""
+        cat = str(category).lower().strip()
+        if cat not in ("amp", "cab"):
+            raise ProtocolError(f"category must be 'amp' or 'cab', got {category!r}")
+        if not isinstance(name, str):
+            raise ProtocolError(f"name must be str, got {type(name).__name__}")
+        clean_name = name.strip()
+        if not clean_name:
+            raise ProtocolError("Slot name cannot be empty")
+        slot_idx = _require_range(slot, 0, NAME_RECORD_COUNT - 1, "slot")
+        frame = build_rename_slot(cat, slot_idx, clean_name)
+
+        with self._op_lock:
+            transport = self._require_active_session()
+            with self._state_lock:
+                self._edit_seq += 1
+                self._last_edit_ts = time.monotonic()
+
+            if transport is not None:
+                self._write_ack(transport, frame)
+                # Re-read the updated 280-byte name table from hardware
+                base_addr = ADDR_AMP_NAMES if cat == "amp" else ADDR_CAB_NAMES
+                updated_table = decode_name_table(
+                    self._read_memory(transport, SPACE_NAMES, base_addr, NAME_TABLE_SIZE)
+                )
+                with self._state_lock:
+                    if cat == "amp":
+                        self._amps = updated_table
+                    else:
+                        self._cabs = updated_table
+            else:
+                with self._state_lock:
+                    target_list = self._amps if cat == "amp" else self._cabs
+                    if slot_idx < len(target_list):
+                        target_list[slot_idx] = clean_name[:13]
+                    else:
+                        while len(target_list) < slot_idx:
+                            target_list.append(f"{cat.upper()} {len(target_list) + 1}")
+                        target_list.append(clean_name[:13])
+
+            return {
+                "ok": True,
+                "category": cat,
+                "slot": slot_idx,
+                "name": clean_name[:13],
+                "state": self.get_state(),
+            }
+
+    def audition_slot(self, category: str, slot: int) -> dict[str, Any]:
+        """Audition an AMP or CAB slot in live RAM, enabling the block so it is heard immediately."""
+        cat = str(category).lower().strip()
+        if cat not in ("amp", "cab"):
+            raise ProtocolError(f"category must be 'amp' or 'cab', got {category!r}")
+        slot_idx = _require_range(slot, 0, NAME_RECORD_COUNT - 1, "slot")
+        block_id = 1 if cat == "amp" else 5
+
+        # 1. Change model in RAM
+        self.change_model(block_id, slot_idx)
+
+        # 2. Ensure block is enabled so sound passes through
+        with self._state_lock:
+            ram = self._ram_bytes
+        if ram:
+            img = PresetImage.from_bytes(ram)
+            if not img.states[block_id]:
+                self.toggle_block(block_id, True)
+
+        return {
+            "ok": True,
+            "category": cat,
+            "slot": slot_idx,
+            "block_id": block_id,
+            "state": self.get_state(),
+        }
+
+    def get_curated_library(self) -> dict[str, Any]:
+        """Return the curated library of native community Overdrives, Amps, and Cabinet IRs."""
+        return {
+            "categories": [
+                {
+                    "id": "overdrives",
+                    "name": "Overdrives & Distortions",
+                    "kind": "amp",
+                    "models": [
+                        {
+                            "id": "ts9",
+                            "name": "3VAVE_TS",
+                            "display_name": "Tube Screamer TS9",
+                            "origin": "Ibanez TS9 / M-VAVE",
+                            "desc": "Classic mid-hump overdrive, smooth saturation, tight low-end boost",
+                            "tags": ["Overdrive", "Mid Boost", "Classic"],
+                        },
+                        {
+                            "id": "rat",
+                            "name": "4RAT_OD",
+                            "display_name": "ProCo RAT",
+                            "origin": "ProCo RAT / M-VAVE",
+                            "desc": "Aggressive hard-clipping distortion with rich harmonic fuzz edge",
+                            "tags": ["Distortion", "Fuzz", "Rock"],
+                        },
+                        {
+                            "id": "guvnor",
+                            "name": "7MS_GV2",
+                            "display_name": "Marshall Guv'nor",
+                            "origin": "Marshall Guv'nor / M-VAVE",
+                            "desc": "Plexi-in-a-box British overdrive with full 3-band EQ response",
+                            "tags": ["Overdrive", "British", "Plexi"],
+                        },
+                        {
+                            "id": "ds1",
+                            "name": "6VAVE_DS",
+                            "display_name": "Orange Distortion",
+                            "origin": "Boss DS-1 Style / M-VAVE",
+                            "desc": "Pronounced mid-scoop hard clipping distortion for grunge and 80s rock",
+                            "tags": ["Distortion", "Orange", "80s"],
+                        },
+                        {
+                            "id": "hts",
+                            "name": "5VAVE_HTS",
+                            "display_name": "High-Gain TS",
+                            "origin": "M-VAVE Custom TS",
+                            "desc": "Hot-rodded Tube Screamer with extended gain range and clarity",
+                            "tags": ["Overdrive", "Hot Rod", "Lead"],
+                        },
+                        {
+                            "id": "marsh_drive",
+                            "name": "6 marshalldri",
+                            "display_name": "Marshall Drive",
+                            "origin": "Marshall Bluesbreaker Capture",
+                            "desc": "Organic tube overdrive breaking into natural British power-amp grind",
+                            "tags": ["Overdrive", "Blues", "Crunch"],
+                        },
+                        {
+                            "id": "od_marvicto",
+                            "name": "4OD-MarVicto",
+                            "display_name": "Victory OD",
+                            "origin": "Victory Marshall Overdrive",
+                            "desc": "Modern boutique British high-headroom overdrive",
+                            "tags": ["Overdrive", "Boutique", "Modern"],
+                        },
+                    ],
+                },
+                {
+                    "id": "clean",
+                    "name": "Clean Preamps & Amps",
+                    "kind": "amp",
+                    "models": [
+                        {
+                            "id": "jc120",
+                            "name": "1J120_CL",
+                            "display_name": "Roland JC-120",
+                            "origin": "Roland Jazz Chorus",
+                            "desc": "Ultra-clean solid-state platform with crystalline highs",
+                            "tags": ["Clean", "Solid State", "Chorus"],
+                        },
+                        {
+                            "id": "jcm900_cl",
+                            "name": "2J900_CL",
+                            "display_name": "JCM900 Clean",
+                            "origin": "Marshall JCM900 Channel A",
+                            "desc": "Bright British clean with articulate chime",
+                            "tags": ["Clean", "British", "Chime"],
+                        },
+                        {
+                            "id": "fender_twin",
+                            "name": "1UWE-Twins",
+                            "display_name": "Fender '65 Twin",
+                            "origin": "Fender Twin Reverb",
+                            "desc": "American blackface clean headroom, deep lows, sparkling bell highs",
+                            "tags": ["Clean", "American", "Blackface"],
+                        },
+                        {
+                            "id": "vox_ac30",
+                            "name": "2UK-C30Normal",
+                            "display_name": "Vox AC30 Top Boost",
+                            "origin": "Vox AC30",
+                            "desc": "Class-A British chime, glassy breakup at edge of overdrive",
+                            "tags": ["Clean", "Chime", "Class A"],
+                        },
+                    ],
+                },
+                {
+                    "id": "crunch",
+                    "name": "Crunch & Classic Rock",
+                    "kind": "amp",
+                    "models": [
+                        {
+                            "id": "jcm800",
+                            "name": "Marshall 800",
+                            "display_name": "Marshall JCM800",
+                            "origin": "Marshall 2203 JCM800",
+                            "desc": "The definitive 80s hard rock voice with cutting midrange bite",
+                            "tags": ["Crunch", "Hard Rock", "British"],
+                        },
+                        {
+                            "id": "victor_mars",
+                            "name": "4Victor Mars",
+                            "display_name": "Victory Sheriff",
+                            "origin": "Victory Amps",
+                            "desc": "Boutique hot-rodded vintage British crunch",
+                            "tags": ["Crunch", "Boutique", "Rock"],
+                        },
+                        {
+                            "id": "engl_savage",
+                            "name": "7ENGL SAVAGE",
+                            "display_name": "Engl Savage 120",
+                            "origin": "ENGL Savage",
+                            "desc": "German precision high-gain crunch with brutal attack",
+                            "tags": ["Crunch", "German", "Tight"],
+                        },
+                    ],
+                },
+                {
+                    "id": "highgain",
+                    "name": "High-Gain & Modern Lead",
+                    "kind": "amp",
+                    "models": [
+                        {
+                            "id": "evh5150",
+                            "name": "9EVH 5150",
+                            "display_name": "Peavey 5150 / 6505",
+                            "origin": "EVH 5150 Block Letter",
+                            "desc": "Legendary modern metal tone with crushing gain and aggressive bite",
+                            "tags": ["High Gain", "Metal", "Modern"],
+                        },
+                        {
+                            "id": "fortin_cali",
+                            "name": "10Fortin Cali",
+                            "display_name": "Fortin Cali Mod",
+                            "origin": "Fortin Amplification",
+                            "desc": "Ultra-tight boutique modified high-gain monster",
+                            "tags": ["High Gain", "Djent", "Boutique"],
+                        },
+                        {
+                            "id": "soldano",
+                            "name": "NDSP Soldano",
+                            "display_name": "Soldano SLO-100",
+                            "origin": "Neural DSP Soldano SLO-100",
+                            "desc": "Singing saturation, thick creamy leads, and huge low-end punch",
+                            "tags": ["High Gain", "Lead", "American"],
+                        },
+                        {
+                            "id": "mesa_recto",
+                            "name": "12MES-FG",
+                            "display_name": "Mesa Dual Rectifier",
+                            "origin": "Mesa Boogie Dual Rectifier",
+                            "desc": "Massive wall-of-sound distortion with scoopable mids and booming bass",
+                            "tags": ["High Gain", "Wall of Sound", "90s Metal"],
+                        },
+                        {
+                            "id": "friedman",
+                            "name": "Friedman Pink",
+                            "display_name": "Friedman Pink Taco",
+                            "origin": "Friedman Amplification",
+                            "desc": "Modified Plexi saturation with harmonically rich overdrive",
+                            "tags": ["High Gain", "Lead", "Boutique"],
+                        },
+                    ],
+                },
+                {
+                    "id": "bass",
+                    "name": "Bass Amplifiers",
+                    "kind": "amp",
+                    "models": [
+                        {
+                            "id": "ampeg_svt",
+                            "name": "17ApSVT_BS",
+                            "display_name": "Ampeg SVT Classic",
+                            "origin": "Ampeg SVT",
+                            "desc": "All-tube 300W bass power with thunderous low end and tube growl",
+                            "tags": ["Bass", "Tube", "Rock"],
+                        },
+                        {
+                            "id": "aguilar",
+                            "name": "16AgDb750_BS",
+                            "display_name": "Aguilar DB750",
+                            "origin": "Aguilar DB750",
+                            "desc": "Hybrid tube-preamp bass amplifier with huge headroom and punch",
+                            "tags": ["Bass", "Punch", "Modern"],
+                        },
+                        {
+                            "id": "darkglass",
+                            "name": "19DgXu_BS",
+                            "display_name": "Darkglass Microtubes",
+                            "origin": "Darkglass Electronics",
+                            "desc": "Cutting aggressive bass distortion with surgical clean blend",
+                            "tags": ["Bass", "Distortion", "Metal"],
+                        },
+                    ],
+                },
+                {
+                    "id": "cabinets",
+                    "name": "Cabinet Impulse Responses (IRs)",
+                    "kind": "cab",
+                    "models": [
+                        {
+                            "id": "mrsh_1960",
+                            "name": "Marshall 1960",
+                            "display_name": "Marshall 1960A 4x12 G12T-75",
+                            "origin": "Marshall / Shure SM57",
+                            "desc": "Industry standard 4x12 rock cabinet with scooped mids and crisp highs",
+                            "tags": ["Cab IR", "4x12", "Rock"],
+                        },
+                        {
+                            "id": "mesa_v30",
+                            "name": "Mesa 4x12 Ove",
+                            "display_name": "Mesa Oversized 4x12 V30",
+                            "origin": "Mesa Boogie / Celestion V30",
+                            "desc": "Huge low-end resonance and focused midrange punch for heavy music",
+                            "tags": ["Cab IR", "4x12", "Metal"],
+                        },
+                        {
+                            "id": "vox_212",
+                            "name": "04B_Vox 2 AC1",
+                            "display_name": "Vox AC30 2x12 Alnico Blue",
+                            "origin": "Vox 2x12 / Celestion Blue",
+                            "desc": "Sparkling chime and warm vintage midrange compression",
+                            "tags": ["Cab IR", "2x12", "Vintage"],
+                        },
+                        {
+                            "id": "orange_212",
+                            "name": "10OrPPC212",
+                            "display_name": "Orange PPC212 Closed Back",
+                            "origin": "Orange / Celestion V30",
+                            "desc": "Thick heavy birch construction with dark punchy response",
+                            "tags": ["Cab IR", "2x12", "Stoner/Doom"],
+                        },
+                        {
+                            "id": "ampeg_810",
+                            "name": "AgSVT410",
+                            "display_name": "Ampeg SVT 8x10 Refrigerator",
+                            "origin": "Ampeg 8x10",
+                            "desc": "The benchmark stadium bass cabinet with tight punch and infinite low end",
+                            "tags": ["Cab IR", "Bass", "8x10"],
+                        },
+                    ],
+                },
+            ]
+        }
 
     def _resolve_ports(
         self, in_id: int | None, out_id: int | None
