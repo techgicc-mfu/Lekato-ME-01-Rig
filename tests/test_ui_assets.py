@@ -295,6 +295,43 @@ class UIAssetsTests(unittest.TestCase):
         self.assertIn("patch-cable-dimmed", js_text)
         self.assertIn("ResizeObserver", js_text)
 
+    def test_photorealistic_amp_head_and_cab_stage(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # 1. #amp-stage-view exists in index.html
+        self.assertIn('id="amp-stage-view"', html_text)
+
+        # 2. Required Amp Head elements in html / css
+        for cls in (
+            "amp-head-enclosure",
+            "amp-tolex",
+            "amp-faceplate",
+            "amp-model-badge",
+            "amp-jewel-lamp",
+            "amp-chicken-knobs",
+            "amp-power-toggle",
+        ):
+            self.assertTrue(cls in html_text or cls in css_text, f"Missing Amp Head element: {cls}")
+
+        # 3. Required Cabinet elements in html / css
+        for cls in (
+            "cab-enclosure",
+            "cab-grille-cloth",
+            "cab-piping",
+            "cab-corners",
+            "cab-knobs",
+        ):
+            self.assertTrue(cls in html_text or cls in css_text, f"Missing Cabinet element: {cls}")
+
+        # 4. renderAmpStage in app.js
+        self.assertIn("renderAmpStage", js_text)
+
+        # 5. Omit ghost controls (Mono/Stereo, Standby, Presence on Amp head)
+        self.assertNotIn("amp-standby", html_text.lower())
+        self.assertNotIn("amp-presence", html_text.lower())
+
 
 if __name__ == "__main__":
     unittest.main()

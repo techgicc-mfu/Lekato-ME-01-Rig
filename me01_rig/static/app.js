@@ -143,6 +143,14 @@
       "patch-cables-svg",
       "knob-floating-tooltip",
       "pedal-cards-row",
+      "amp-stage-view",
+      "amp-model-badge",
+      "amp-badge-text",
+      "amp-chicken-knobs",
+      "amp-jewel-lamp",
+      "amp-power-toggle",
+      "cab-badge-text",
+      "cab-knobs",
       "btn-move-earlier",
       "btn-move-later",
       "btn-parallel-unsupported",
@@ -1904,6 +1912,80 @@
     }
   }
 
+  function renderAmpStage() {
+    const stage = els["amp-stage-view"];
+    if (!stage) return;
+
+    const ram = app.state?.ram;
+    if (!ram || !Array.isArray(ram.blocks)) return;
+
+    const ampBlock = getBlockById(ram, 1);
+    const cabBlock = getBlockById(ram, 5);
+
+    if (ampBlock) {
+      if (els["amp-badge-text"]) {
+        els["amp-badge-text"].textContent = ampBlock.model_name || "VINTAGE TUBE AMP";
+      }
+      const isAmpOn = Boolean(ampBlock.enabled);
+      if (els["amp-jewel-lamp"]) {
+        els["amp-jewel-lamp"].classList.toggle("is-on", isAmpOn);
+      }
+      if (els["amp-power-toggle"]) {
+        els["amp-power-toggle"].classList.toggle("is-on", isAmpOn);
+        els["amp-power-toggle"].setAttribute("aria-pressed", String(isAmpOn));
+      }
+
+      const chickenContainer = els["amp-chicken-knobs"];
+      if (chickenContainer) {
+        chickenContainer.replaceChildren();
+        const svgNs = els["patch-cables-svg"] ? els["patch-cables-svg"].namespaceURI : null;
+        const svg = svgNs
+          ? document.createElementNS(svgNs, "svg")
+          : document.createElement("svg");
+        svg.setAttribute("viewBox", "0 0 340 68");
+        svg.setAttribute("class", "amp-knobs-svg");
+        svg.style.width = "100%";
+        svg.style.height = "68px";
+
+        const ns = svg.namespaceURI;
+        const knobs = ampBlock.knobs || [];
+        knobs.forEach((knob, idx) => {
+          const cx = 34 + idx * 68;
+          const cy = 34;
+          appendInteractiveKnobSvg(svg, ns, cx, cy, 18, knob, ampBlock);
+        });
+        chickenContainer.appendChild(svg);
+      }
+    }
+
+    if (cabBlock) {
+      if (els["cab-badge-text"]) {
+        els["cab-badge-text"].textContent = cabBlock.model_name || "LEKATO 4x12";
+      }
+      const cabKnobsContainer = els["cab-knobs"];
+      if (cabKnobsContainer) {
+        cabKnobsContainer.replaceChildren();
+        const svgNs = els["patch-cables-svg"] ? els["patch-cables-svg"].namespaceURI : null;
+        const cabSvg = svgNs
+          ? document.createElementNS(svgNs, "svg")
+          : document.createElement("svg");
+        cabSvg.setAttribute("viewBox", "0 0 240 68");
+        cabSvg.setAttribute("class", "cab-knobs-svg");
+        cabSvg.style.width = "100%";
+        cabSvg.style.height = "68px";
+
+        const ns = cabSvg.namespaceURI;
+        const knobs = cabBlock.knobs || [];
+        knobs.forEach((knob, idx) => {
+          const cx = 40 + idx * 80;
+          const cy = 34;
+          appendInteractiveKnobSvg(cabSvg, ns, cx, cy, 16, knob, cabBlock);
+        });
+        cabKnobsContainer.appendChild(cabSvg);
+      }
+    }
+  }
+
   function renderInspectorSubtitle() {
     const ram = app.state?.ram;
     const block = getBlockById(ram, app.selectedBlockId);
@@ -2106,6 +2188,7 @@
     renderBackupNote();
     renderSidebar();
     renderPedalboard();
+    renderAmpStage();
     renderInspector();
     if (!els["modal-backup"].hidden) {
       updateBackupRestoreButtons();
@@ -2113,6 +2196,23 @@
   }
 
   function bindEvents() {
+    if (els["amp-power-toggle"]) {
+      els["amp-power-toggle"].addEventListener("click", () => {
+        const ampBlock = getBlockById(app.state?.ram, 1);
+        if (ampBlock) {
+          void handleToggleBlock(1, !ampBlock.enabled);
+        }
+      });
+    }
+    if (els["amp-jewel-lamp"]) {
+      els["amp-jewel-lamp"].addEventListener("click", () => {
+        const ampBlock = getBlockById(app.state?.ram, 1);
+        if (ampBlock) {
+          void handleToggleBlock(1, !ampBlock.enabled);
+        }
+      });
+    }
+
     els["btn-refresh-ports"].addEventListener("click", () => {
       void refreshPorts();
     });
