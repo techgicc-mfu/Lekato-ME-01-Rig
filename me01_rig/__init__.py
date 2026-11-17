@@ -1,6 +1,7 @@
 """ME-01 Rig package for LEKATO ME-01 USB-MIDI desktop editor."""
 
 from .device_service import DeviceService
+from .server import create_server
 from .protocol import (
     ACK_FRAME,
     BLOCK_IDS,
@@ -82,6 +83,7 @@ __all__ = [
     "build_read_request",
     "build_save_flash",
     "build_toggle_block",
+    "create_server",
     "decode7",
     "decode_name_table",
     "encode7",
