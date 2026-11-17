@@ -1,0 +1,359 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ME-01 RIG — LEKATO ME-01 Pedalboard Editor</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script defer src="/app.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div class="topbar-left">
+        <div class="brand-mark" aria-label="ME-01 RIG">
+          <span class="brand-main">ME-01</span><span class="brand-accent">RIG</span>
+        </div>
+
+        <div id="conn-pill" class="conn-pill is-disconnected" role="status">
+          <span class="conn-dot" aria-hidden="true"></span>
+          <span id="conn-label">Disconnected</span>
+        </div>
+
+        <div class="port-controls">
+          <select id="port-select" class="select-input select-ports" aria-label="USB-MIDI port pair">
+            <option value="">Auto-detect USB-MIDI</option>
+          </select>
+          <button id="btn-refresh-ports" type="button" class="btn btn-ghost btn-sm" title="Rescan MIDI ports">Scan</button>
+          <button id="btn-connect" type="button" class="btn btn-secondary btn-sm">Connect</button>
+          <button id="btn-demo" type="button" class="btn btn-ghost btn-sm">Demo</button>
+          <button id="btn-disconnect" type="button" class="btn btn-ghost btn-sm" hidden>Disconnect</button>
+        </div>
+      </div>
+
+      <div class="topbar-right">
+        <div class="slot-status-group">
+          <span class="meta-label">SLOT</span>
+          <span id="active-slot-badge" class="slot-badge">--</span>
+          <span id="modified-pill" class="modified-pill" hidden>Modified</span>
+        </div>
+
+        <div class="patch-vol-box">
+          <label for="patch-vol-slider" class="meta-label">PATCH VOL</label>
+          <input id="patch-vol-slider" class="studio-slider patch-vol-slider" type="range" min="0" max="100" step="1" value="0" disabled>
+          <input id="patch-vol-number" class="num-input num-input-sm" type="number" min="0" max="100" step="1" value="0" aria-label="Patch Volume (0 to 100)" disabled>
+        </div>
+
+        <div class="toolbar-actions">
+          <button id="btn-refresh-ram" type="button" class="btn btn-ghost btn-sm" disabled>Refresh RAM</button>
+          <button id="btn-undo" type="button" class="btn btn-ghost btn-sm" disabled>
+            Undo <span id="undo-depth-badge" class="badge-count">0</span>
+          </button>
+          <button id="btn-revert" type="button" class="btn btn-ghost btn-sm" disabled>Revert</button>
+          <button id="btn-backup" type="button" class="btn btn-secondary btn-sm" disabled>Backup</button>
+          <button id="btn-save-slot" type="button" class="btn btn-primary btn-sm" disabled>Save to Slot</button>
+        </div>
+      </div>
+    </header>
+
+    <div id="error-banner" class="error-banner" role="alert" hidden>
+      <span id="error-banner-text" class="error-banner-text"></span>
+      <button id="btn-dismiss-error" type="button" class="btn-icon" aria-label="Dismiss error">&times;</button>
+    </div>
+
+    <div class="workspace">
+      <aside class="sidebar" aria-label="Preset Bank">
+        <div class="sidebar-header">
+          <div>
+            <h2 class="panel-title">Presets</h2>
+            <p class="panel-subtitle">P01–P40 Factory · P41–P80 User</p>
+          </div>
+          <span id="preset-count-badge" class="count-pill">0</span>
+        </div>
+
+        <div class="bank-tabs" role="tablist" aria-label="Preset bank filter">
+          <button type="button" class="bank-tab is-active" data-bank="all" role="tab" aria-selected="true">All</button>
+          <button type="button" class="bank-tab" data-bank="factory" role="tab" aria-selected="false">P01–P40 Factory</button>
+          <button type="button" class="bank-tab" data-bank="user" role="tab" aria-selected="false">P41–P80 User</button>
+        </div>
+
+        <div class="sidebar-search-wrap">
+          <input id="preset-search" class="text-input" type="search" placeholder="Filter by slot, amp, or cab...">
+        </div>
+
+        <div class="factory-lock-card">
+          <label class="checkbox-label" for="chk-unlock-factory">
+            <input id="chk-unlock-factory" type="checkbox">
+            <span>Unlock Factory Slots (P01–P40)</span>
+          </label>
+          <div id="factory-unlock-warning" class="factory-warning-banner" hidden>
+            Factory slots P01–P40 unlocked. Writes can overwrite stock factory presets.
+          </div>
+        </div>
+
+        <div id="preset-list" class="preset-list" role="listbox" aria-label="Preset slots"></div>
+      </aside>
+
+      <main class="main-stage">
+        <section class="panel pedalboard-panel" aria-label="Signal Chain Pedalboard">
+          <div class="panel-header-row">
+            <div class="panel-title-group">
+              <h2 class="panel-title">Signal Chain</h2>
+              <span id="chain-order-summary" class="chain-summary">IN &rarr; OUT</span>
+            </div>
+            <div id="last-backup-note" class="backup-note"></div>
+          </div>
+
+          <div id="pedalboard-stage" class="pedalboard-stage" tabindex="0">
+            <div id="pedalboard-empty" class="empty-state">
+              <p class="empty-title">No ME-01 Session Active</p>
+              <p class="empty-desc">Click <strong>Connect</strong> to handshake with a USB-MIDI pedal or choose <strong>Demo</strong> to inspect the captured ME-01_016 rig offline.</p>
+            </div>
+
+            <div id="pedalboard-chain" class="pedalboard-chain" hidden>
+              <div class="jack-node" aria-label="Input jack">
+                <span class="jack-ring"><span class="jack-hole"></span></span>
+                <span class="jack-label">IN</span>
+              </div>
+
+              <div class="chain-track">
+                <div class="signal-bus" aria-hidden="true"></div>
+                <div id="pedal-cards-row" class="pedal-cards-row"></div>
+              </div>
+
+              <div class="jack-node" aria-label="Output jack">
+                <span class="jack-ring"><span class="jack-hole"></span></span>
+                <span class="jack-label">OUT</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="chain-footer">
+            <p class="chain-hint">Drag a pedal to reorder it, or select a block and use these buttons or the Left / Right arrow keys.</p>
+            <div class="chain-controls-row">
+              <div class="chain-btn-group">
+                <button id="btn-move-earlier" type="button" class="btn btn-secondary btn-sm" disabled>&lsaquo; Earlier</button>
+                <button id="btn-move-later" type="button" class="btn btn-secondary btn-sm" disabled>Later &rsaquo;</button>
+                <button id="btn-parallel-unsupported" type="button" class="btn btn-ghost btn-sm btn-parallel" disabled title="Stock ME-01 firmware supports 6 serial blocks only; parallel routing is unsupported">+ parallel</button>
+              </div>
+              <span class="parallel-notice">Stock ME-01 firmware supports 6 serial blocks only; parallel routing unsupported.</span>
+            </div>
+            <div id="chain-position-bars" class="chain-position-bars" aria-hidden="true"></div>
+          </div>
+        </section>
+
+        <section class="panel inspector-panel" aria-label="Selected Block Inspector">
+          <div id="inspector-empty" class="empty-state empty-state-compact">
+            <p class="empty-desc">Select any stomp block above to edit its model, bypass state, and parameters.</p>
+          </div>
+
+          <div id="inspector-content" class="inspector-content" hidden>
+            <div class="inspector-header">
+              <div class="inspector-title-cluster">
+                <span id="inspector-block-badge" class="block-pill">FX</span>
+                <div>
+                  <div class="inspector-heading-row">
+                    <h2 id="inspector-model-heading" class="panel-title">Noise Gate++</h2>
+                    <span id="inspector-fw-badge" class="fw-badge" hidden>V17+</span>
+                  </div>
+                  <p id="inspector-block-subtitle" class="panel-subtitle">Block 0 · Slot 1 in chain</p>
+                </div>
+              </div>
+
+              <div class="inspector-controls">
+                <button id="btn-inspector-bypass" type="button" class="bypass-pill is-on">ACTIVE</button>
+                <label class="model-select-wrap" for="inspector-model-select">
+                  <span class="meta-label">MODEL</span>
+                  <select id="inspector-model-select" class="select-input select-model"></select>
+                </label>
+              </div>
+            </div>
+
+            <div id="delay-tempo-strip" class="special-strip tempo-strip" hidden>
+              <div class="tempo-readouts">
+                <span class="meta-label">DELAY TEMPO</span>
+                <span id="dly-ms-readout" class="mono-pill">370 ms</span>
+                <span id="dly-bpm-readout" class="mono-pill mono-pill-accent">162.2 BPM</span>
+              </div>
+              <div class="tempo-actions">
+                <label class="tempo-bpm-label" for="dly-bpm-input">
+                  <span>BPM</span>
+                  <input id="dly-bpm-input" class="num-input" type="number" min="20" max="1200" step="0.1" value="120.0">
+                </label>
+                <button id="btn-dly-apply-bpm" type="button" class="btn btn-secondary btn-sm">Apply BPM</button>
+                <button id="btn-tap-tempo" type="button" class="btn btn-primary btn-sm">Tap Tempo</button>
+                <span id="tap-tempo-status" class="tap-tempo-status">Tap 2+ times within 2.5s to set Time</span>
+              </div>
+            </div>
+
+            <div id="cab-scale-note" class="special-strip cab-note-strip" hidden>
+              <span class="cab-note-badge">CAB EQ SCALE</span>
+              <span>CAB High Cut raw wire 0–100 maps linearly from 0 = 5.0 kHz to 100 = 18.0 kHz (never inverted). Low Cut maps 0–100 to 20–300 Hz.</span>
+            </div>
+
+            <div id="inspector-knobs" class="inspector-knobs"></div>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <!-- SVG pedal artwork templates (pure inline HTML5 SVG, zero external URLs) -->
+  <template id="tpl-pedal-stomp">
+    <svg class="pedal-svg" viewBox="0 0 108 134" aria-hidden="true">
+      <rect x="6" y="4" width="96" height="126" rx="11" class="svg-chassis"></rect>
+      <rect x="12" y="10" width="84" height="54" rx="6" class="svg-faceplate"></rect>
+      <g class="svg-knobs-layer"></g>
+      <rect x="20" y="70" width="68" height="14" rx="4" class="svg-label-plate"></rect>
+      <circle cx="54" cy="60" r="4" class="svg-led-halo"></circle>
+      <circle cx="54" cy="60" r="2.6" class="svg-led"></circle>
+      <circle cx="54" cy="105" r="14" class="svg-switch-bezel"></circle>
+      <circle cx="54" cy="105" r="9.5" class="svg-switch-cap"></circle>
+      <circle cx="54" cy="105" r="5" class="svg-switch-core"></circle>
+    </svg>
+  </template>
+
+  <template id="tpl-pedal-amp">
+    <svg class="pedal-svg pedal-svg-amp" viewBox="0 0 132 114" aria-hidden="true">
+      <rect x="4" y="6" width="124" height="102" rx="9" class="svg-amp-cabinet"></rect>
+      <rect x="11" y="13" width="110" height="32" rx="4" class="svg-amp-faceplate"></rect>
+      <g class="svg-knobs-layer"></g>
+      <rect x="11" y="51" width="110" height="48" rx="4" class="svg-amp-grille"></rect>
+      <line x1="16" y1="61" x2="116" y2="61" class="svg-amp-grille-line"></line>
+      <line x1="16" y1="71" x2="116" y2="71" class="svg-amp-grille-line"></line>
+      <line x1="16" y1="81" x2="116" y2="81" class="svg-amp-grille-line"></line>
+      <line x1="16" y1="91" x2="116" y2="91" class="svg-amp-grille-line"></line>
+      <circle cx="112" cy="29" r="3.4" class="svg-led"></circle>
+    </svg>
+  </template>
+
+  <template id="tpl-pedal-cab">
+    <svg class="pedal-svg" viewBox="0 0 108 134" aria-hidden="true">
+      <rect x="10" y="6" width="88" height="122" rx="9" class="svg-cab-cabinet"></rect>
+      <rect x="16" y="12" width="76" height="110" rx="5" class="svg-cab-baffle"></rect>
+      <circle cx="54" cy="40" r="21" class="svg-cab-cone"></circle>
+      <circle cx="54" cy="40" r="8" class="svg-cab-cap"></circle>
+      <circle cx="54" cy="92" r="23" class="svg-cab-cone"></circle>
+      <circle cx="54" cy="92" r="9" class="svg-cab-cap"></circle>
+      <circle cx="82" cy="20" r="3" class="svg-led"></circle>
+    </svg>
+  </template>
+
+  <!-- Save to Slot Modal -->
+  <div id="modal-save" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-save-title" hidden>
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3 id="modal-save-title" class="modal-title">Save Live RAM to Flash Slot</h3>
+        <button type="button" class="btn-icon modal-close" data-close-modal="modal-save" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-desc">
+          ME-01 writes 92 bytes directly to flash and immediately verifies byte-for-byte via read-back. A pre-save backup file is created automatically first.
+        </p>
+
+        <label class="field-group" for="save-slot-select">
+          <span class="meta-label">TARGET FLASH SLOT</span>
+          <select id="save-slot-select" class="select-input"></select>
+        </label>
+
+        <div id="save-slot-notice" class="modal-notice" hidden></div>
+
+        <label id="save-factory-confirm-wrap" class="checkbox-label modal-confirm-box" hidden>
+          <input id="chk-save-factory-confirm" type="checkbox">
+          <span>I confirm overwriting this unlocked Factory slot (P01–P40).</span>
+        </label>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close-modal="modal-save">Cancel</button>
+        <button id="btn-confirm-save" type="button" class="btn btn-primary">Confirm Save to Flash</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revert Confirmation Modal -->
+  <div id="modal-revert" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-revert-title" hidden>
+    <div class="modal-card modal-card-sm">
+      <div class="modal-header">
+        <h3 id="modal-revert-title" class="modal-title">Revert RAM to Saved Slot</h3>
+        <button type="button" class="btn-icon modal-close" data-close-modal="modal-revert" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="revert-modal-desc" class="modal-desc">
+          Reload the active flash preset into live RAM? All unsaved edits in RAM will be discarded.
+        </p>
+      </div>
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close-modal="modal-revert">Cancel</button>
+        <button id="btn-confirm-revert" type="button" class="btn btn-danger">Discard Edits &amp; Revert</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Backup & Restore Modal -->
+  <div id="modal-backup" class="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="modal-backup-title" hidden>
+    <div class="modal-card modal-card-lg">
+      <div class="modal-header">
+        <h3 id="modal-backup-title" class="modal-title">Backup &amp; Restore</h3>
+        <button type="button" class="btn-icon modal-close" data-close-modal="modal-backup" aria-label="Close">&times;</button>
+      </div>
+      <div class="modal-body backup-modal-body">
+        <section class="backup-section">
+          <div class="backup-section-header">
+            <div>
+              <h4 class="backup-section-title">Export Full 80-Slot Backup</h4>
+              <p class="panel-subtitle">Saves all 80 presets, AMP/CAB names, and live RAM to a timestamped JSON file.</p>
+            </div>
+            <button id="btn-export-backup" type="button" class="btn btn-primary btn-sm">Export Backup JSON</button>
+          </div>
+          <p id="export-status-text" class="backup-path-line"></p>
+        </section>
+
+        <section class="backup-section">
+          <div class="backup-section-header">
+            <div>
+              <h4 class="backup-section-title">Load Backup File for Audition or Restore</h4>
+              <p class="panel-subtitle">Test any preset safely via <strong>Audition in RAM</strong> or run verified <strong>Batch Flash Restore</strong>.</p>
+            </div>
+            <label class="btn btn-secondary btn-sm file-picker-btn" for="backup-file-input">
+              Choose Backup JSON
+              <input id="backup-file-input" type="file" accept=".json,application/json" hidden>
+            </label>
+          </div>
+
+          <div id="backup-meta-summary" class="backup-meta-summary" hidden></div>
+
+          <div id="backup-restore-controls" class="backup-restore-controls" hidden>
+            <div class="restore-toolbar">
+              <div class="restore-select-btns">
+                <button id="btn-select-user-slots" type="button" class="btn btn-ghost btn-sm">Select User (P41–P80)</button>
+                <button id="btn-select-changed-slots" type="button" class="btn btn-ghost btn-sm">Select Changed</button>
+                <button id="btn-select-all-slots" type="button" class="btn btn-ghost btn-sm">Select All</button>
+                <button id="btn-clear-slot-selection" type="button" class="btn btn-ghost btn-sm">Clear</button>
+              </div>
+              <span id="restore-progress-text" class="restore-progress-text">0 selected</span>
+            </div>
+
+            <div class="progress-track" aria-hidden="true">
+              <div id="restore-progress-bar" class="progress-fill" style="width: 0%"></div>
+            </div>
+
+            <div id="backup-slots-list" class="backup-slots-list"></div>
+
+            <div id="restore-factory-warning" class="modal-notice is-warning" hidden></div>
+            <label id="restore-factory-confirm-wrap" class="checkbox-label modal-confirm-box" hidden>
+              <input id="chk-restore-factory-confirm" type="checkbox">
+              <span>I confirm batch restoring unlocked Factory slots (P01–P40).</span>
+            </label>
+          </div>
+        </section>
+      </div>
+      <div class="modal-footer">
+        <button id="btn-close-backup" type="button" class="btn btn-ghost" data-close-modal="modal-backup">Close</button>
+        <button id="btn-batch-restore" type="button" class="btn btn-primary" disabled>Batch Flash Restore</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast-region" class="toast-region" aria-live="polite"></div>
+</body>
+</html>
