@@ -11,7 +11,12 @@ from typing import Any
 from urllib.parse import unquote, urlsplit
 
 from .device_service import DeviceService
-from .protocol import FactorySlotLockedError, ProtocolError
+from .protocol import (
+    FactorySlotLockedError,
+    ProtocolError,
+    parse_capture_header,
+    parse_wav_header,
+)
 from .winmm_midi import MidiTransportError
 
 _MAX_JSON_BODY_BYTES = 10 * 1024 * 1024
@@ -154,6 +159,9 @@ class ME01RequestHandler(BaseHTTPRequestHandler):
         if path == "/api/presets":
             self._send_json(200, {"presets": svc.get_presets()})
             return
+        if path == "/api/models/library":
+            self._send_json(200, {"library": svc.get_curated_library()})
+            return
         if path == "/api/backup/export":
             meta = svc.export_backup()
             backup_data = json.loads(Path(meta["path"]).read_text(encoding="utf-8"))
@@ -281,6 +289,46 @@ class ME01RequestHandler(BaseHTTPRequestHandler):
                 200,
                 svc.batch_restore_backup(backup_data, slot_ids, allow_factory=allow_factory),
             )
+            return
+
+        if path == "/api/models/rename":
+            category = str(body.get("category", "")).strip()
+            slot = _require_int_field(body, "slot")
+            name = str(body.get("name", "")).strip()
+            self._send_json(200, svc.rename_slot(category, slot, name))
+            return
+
+        if path == "/api/models/audition":
+            category = str(body.get("category", "")).strip()
+            slot = _require_int_field(body, "slot")
+            self._send_json(200, svc.audition_slot(category, slot))
+            return
+
+        if path == "/api/models/validate_import":
+            import base64
+
+            filename = str(body.get("filename", "")).strip()
+            content_b64 = str(body.get("content_base64", "")).strip()
+            try:
+                raw_bytes = base64.b64decode(content_b64)
+            except Exception as exc:
+                raise _BadRequestError(f"Invalid base64 payload: {exc}") from exc
+            if filename.lower().endswith(".wav"):
+                meta = parse_wav_header(raw_bytes)
+                self._send_json(
+                    200, {"ok": True, "kind": "cab", "filename": filename, "details": meta}
+                )
+            else:
+                meta = parse_capture_header(raw_bytes)
+                self._send_json(
+                    200,
+                    {
+                        "ok": True,
+                        "kind": meta["kind"],
+                        "filename": filename,
+                        "details": meta,
+                    },
+                )
             return
 
         self._send_json(404, {"error": "Not found"})

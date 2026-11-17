@@ -418,6 +418,76 @@ class ServerTests(unittest.TestCase):
         mock_service.connect.assert_called_once_with()
         mock_service.disconnect.assert_called_once_with()
 
+    def test_models_rename_audition_and_library_routes(self) -> None:
+        import base64
+
+        _, _, port = self._start_server(demo=True)
+
+        # 1. GET /api/models/library
+        status_lib, _, lib_body = self._json_request(port, "GET", "/api/models/library")
+        self.assertEqual(status_lib, 200)
+        self.assertIn("library", lib_body)
+        self.assertIn("categories", lib_body["library"])
+
+        # 2. POST /api/models/rename
+        status_ren, _, ren_body = self._json_request(
+            port,
+            "POST",
+            "/api/models/rename",
+            {"category": "amp", "slot": 1, "name": "AC30 TopBoost"},
+        )
+        self.assertEqual(status_ren, 200)
+        self.assertTrue(ren_body["ok"])
+        self.assertEqual(ren_body["name"], "AC30 TopBoost")
+        self.assertEqual(ren_body["state"]["amps"][1], "AC30 TopBoost")
+
+        # Invalid rename
+        status_bad, _, bad_body = self._json_request(
+            port,
+            "POST",
+            "/api/models/rename",
+            {"category": "mod", "slot": 1, "name": "InvalidCat"},
+        )
+        self.assertEqual(status_bad, 400)
+        self.assertIn("error", bad_body)
+
+        # 3. POST /api/models/audition
+        status_aud, _, aud_body = self._json_request(
+            port,
+            "POST",
+            "/api/models/audition",
+            {"category": "amp", "slot": 3},
+        )
+        self.assertEqual(status_aud, 200)
+        self.assertTrue(aud_body["ok"])
+        amp_blk = next(b for b in aud_body["state"]["ram"]["blocks"] if b["block_id"] == 1)
+        self.assertEqual(amp_blk["model_id"], 3)
+        self.assertTrue(amp_blk["enabled"])
+
+        # 4. POST /api/models/validate_import
+        raw_am4 = b"AM4\x003VAVE_TS\x00\x00\x00\x00\x00" + b"\x00" * 100
+        b64_content = base64.b64encode(raw_am4).decode("ascii")
+        status_imp, _, imp_body = self._json_request(
+            port,
+            "POST",
+            "/api/models/validate_import",
+            {"filename": "TS9.am4", "content_base64": b64_content},
+        )
+        self.assertEqual(status_imp, 200)
+        self.assertTrue(imp_body["ok"])
+        self.assertEqual(imp_body["kind"], "amp")
+        self.assertEqual(imp_body["details"]["name"], "3VAVE_TS")
+
+        # Invalid import
+        status_bad_imp, _, bad_imp_body = self._json_request(
+            port,
+            "POST",
+            "/api/models/validate_import",
+            {"filename": "corrupt.am4", "content_base64": "Tm90VmFsaWQ="},
+        )
+        self.assertEqual(status_bad_imp, 400)
+        self.assertIn("error", bad_imp_body)
+
 
 if __name__ == "__main__":
     unittest.main()
