@@ -328,7 +328,7 @@ class ServerTests(unittest.TestCase):
         self.assertEqual(status, 200)
         self.assertEqual(headers.get("content-type"), "application/javascript; charset=utf-8")
 
-        for traversal_path in ("/../secret.txt", "/%2e%2e/secret.txt", "/missing.js"):
+        for traversal_path in ("/../secret.txt", "/%2e%2e/secret.txt", "/missing.js", "/bad:name"):
             status, _, _ = self._request(port, "GET", traversal_path)
             self.assertEqual(status, 404)
 
@@ -405,6 +405,18 @@ class ServerTests(unittest.TestCase):
         shutter.join(timeout=2.0)
         self.assertEqual(exit_code, 0)
         self.assertEqual(len(started_port), 1)
+
+    def test_launcher_disconnects_on_startup_failure(self) -> None:
+        mock_service = mock.MagicMock(spec=DeviceService)
+        with (
+            mock.patch.object(launch, "DeviceService", return_value=mock_service),
+            mock.patch.object(launch, "create_server", side_effect=OSError("port in use")),
+        ):
+            with self.assertRaises(OSError):
+                launch.main(["--no-browser", "--port", "8765"])
+
+        mock_service.connect.assert_called_once_with()
+        mock_service.disconnect.assert_called_once_with()
 
 
 if __name__ == "__main__":

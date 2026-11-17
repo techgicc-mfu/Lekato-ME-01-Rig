@@ -109,27 +109,29 @@ def main(argv: Sequence[str] | None = None) -> int:
     fixture_path = app_dir / "tests" / "fixtures" / "me01_captured_vectors.json"
 
     service = DeviceService(backup_dir=backup_dir, fixture_path=fixture_path)
-    if args.demo:
-        service.enter_demo_mode()
-    else:
-        try:
-            service.connect()
-        except (MidiTransportError, ProtocolError, OSError):
-            service.enter_demo_mode()
-
-    server = create_server(service, host=args.host, port=args.port)
-    bound_host, bound_port = server.server_address[:2]
-    url = f"http://{bound_host}:{bound_port}/"
-
-    server_thread = threading.Thread(
-        target=server.serve_forever,
-        name="me01-http-server",
-        daemon=True,
-    )
-    server_thread.start()
-
+    server = None
+    server_thread: threading.Thread | None = None
     browser_proc: subprocess.Popen[bytes] | None = None
     try:
+        if args.demo:
+            service.enter_demo_mode()
+        else:
+            try:
+                service.connect()
+            except (MidiTransportError, ProtocolError, OSError):
+                service.enter_demo_mode()
+
+        server = create_server(service, host=args.host, port=args.port)
+        bound_host, bound_port = server.server_address[:2]
+        url = f"http://{bound_host}:{bound_port}/"
+
+        server_thread = threading.Thread(
+            target=server.serve_forever,
+            name="me01-http-server",
+            daemon=True,
+        )
+        server_thread.start()
+
         if args.no_browser:
             print(f"ME-01 Rig listening at {url}", flush=True)
             while server_thread.is_alive():
@@ -153,9 +155,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     except KeyboardInterrupt:
         pass
     finally:
-        server.shutdown()
-        server.server_close()
-        server_thread.join(timeout=2.0)
+        if server is not None:
+            server.shutdown()
+            server.server_close()
+        if server_thread is not None:
+            server_thread.join(timeout=2.0)
         service.disconnect()
 
     return 0

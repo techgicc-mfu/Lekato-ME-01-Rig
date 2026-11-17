@@ -339,22 +339,26 @@ class ME01RequestHandler(BaseHTTPRequestHandler):
             self._send_text(404, "Not found")
             return
 
-        base_dir = static_root.resolve()
-        rel = "index.html" if decoded in ("", "/") else decoded.lstrip("/")
-        if not rel or rel.endswith("/"):
+        try:
+            base_dir = static_root.resolve()
+            rel = "index.html" if decoded in ("", "/") else decoded.lstrip("/")
+            if not rel or rel.endswith("/"):
+                self._send_text(404, "Not found")
+                return
+
+            candidate = (base_dir / rel).resolve()
+            if (
+                not candidate.is_relative_to(base_dir)
+                or candidate == base_dir
+                or not candidate.is_file()
+            ):
+                self._send_text(404, "Not found")
+                return
+
+            data = candidate.read_bytes()
+        except (OSError, ValueError):
             self._send_text(404, "Not found")
             return
-
-        candidate = (base_dir / rel).resolve()
-        if (
-            not candidate.is_relative_to(base_dir)
-            or candidate == base_dir
-            or not candidate.is_file()
-        ):
-            self._send_text(404, "Not found")
-            return
-
-        data = candidate.read_bytes()
         content_type = _guess_content_type(candidate)
         self.send_response(200)
         self.send_header("Content-Type", content_type)
