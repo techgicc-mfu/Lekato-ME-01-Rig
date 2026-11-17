@@ -436,6 +436,28 @@ class UIAssetsTests(unittest.TestCase):
         self.assertNotIn(".innerHTML", js_text)
         self.assertNotIn("insertAdjacentHTML", js_text)
 
+    def test_review_findings_knob_wiring_and_drawer_sync(self) -> None:
+        js_text = APP_JS.read_text(encoding="utf-8")
+
+        # [CRITICAL-1]: queueKnobChange is explicitly defined as a function
+        self.assertRegex(js_text, r"function\s+queueKnobChange\s*\(")
+        self.assertIn("scheduleKnobWrite", js_text)
+
+        # [IMPORTANT-1]: renderAll updates effects library when drawer is open
+        self.assertRegex(
+            js_text,
+            r'renderEffectsLibrary\(\);\s*\}\s*if\s*\(!els\["modal-backup"\]',
+        )
+
+        # [IMPORTANT-2]: knob.label fallback and formatKnobDisplay usage
+        self.assertIn("knob.label", js_text)
+        self.assertIn("formatKnobDisplay", js_text)
+
+        # [IMPORTANT-3]: data-cx and data-cy on rotary-knob-group, rotary-pointer-group target
+        self.assertIn('group.setAttribute("data-cx"', js_text)
+        self.assertIn('group.setAttribute("data-cy"', js_text)
+        self.assertIn(".rotary-pointer-group", js_text)
+
 
 if __name__ == "__main__":
     unittest.main()

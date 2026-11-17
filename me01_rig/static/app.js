@@ -443,7 +443,8 @@
       if (pointer) {
         const cx = pointer.getAttribute("data-cx");
         const cy = pointer.getAttribute("data-cy");
-        pointer.setAttribute("transform", `rotate(${deg.toFixed(1)} ${cx} ${cy})`);
+        const target = pointer.querySelector(".rotary-pointer-group") || pointer;
+        target.setAttribute("transform", `rotate(${deg.toFixed(1)} ${cx} ${cy})`);
       }
 
       if (refs.blockId === 3 && refs.slot === 0) {
@@ -522,6 +523,10 @@
         app.knobQueue.delete(addr);
       }
     }
+  }
+
+  function queueKnobChange(addr, rawValue, immediate = false) {
+    scheduleKnobWrite(addr, rawValue, immediate);
   }
 
   async function refreshPorts() {
@@ -1565,6 +1570,10 @@
     group.setAttribute("class", "rotary-knob-group");
     group.setAttribute("data-knob-slot", String(knob.slot));
     group.setAttribute("data-knob-addr", String(knob.addr));
+    group.setAttribute("data-cx", String(cx));
+    group.setAttribute("data-cy", String(cy));
+
+    const knobLabel = knob.label || knob.name || "";
 
     const dial = document.createElementNS(ns, "circle");
     dial.setAttribute("cx", String(cx));
@@ -1600,14 +1609,21 @@
 
     group.append(dial, pointerGroup, cap);
 
-    if (radius >= 8.5 && knob.name) {
+    if (radius >= 8.5 && knobLabel) {
       const lbl = document.createElementNS(ns, "text");
       lbl.setAttribute("x", String(cx));
       lbl.setAttribute("y", String(cy + radius + 7));
       lbl.setAttribute("class", "rotary-knob-label");
-      lbl.textContent = knob.name.slice(0, 5);
+      lbl.textContent = knobLabel.slice(0, 5);
       group.append(lbl);
     }
+
+    const getTooltipDisplay = (raw) => {
+      if (block && typeof formatKnobDisplay === "function") {
+        return formatKnobDisplay(block.block_id, block.model_id, knob.slot, raw);
+      }
+      return formatKnobValue(knob, raw);
+    };
 
     let isDragging = false;
     let startY = 0;
@@ -1621,7 +1637,7 @@
       startVal = knob.raw;
       group.setPointerCapture(ev.pointerId);
       group.classList.add("is-active");
-      showKnobTooltip(group, knob.name, formatKnobValue(knob, knob.raw));
+      showKnobTooltip(group, knobLabel, getTooltipDisplay(knob.raw));
     });
 
     group.addEventListener("pointermove", (ev) => {
@@ -1633,7 +1649,7 @@
       if (nextVal !== knob.raw) {
         knob.raw = nextVal;
         updateKnobAngle(pointerGroup, cx, cy, nextVal, maxVal);
-        showKnobTooltip(group, knob.name, formatKnobValue(knob, nextVal));
+        showKnobTooltip(group, knobLabel, getTooltipDisplay(nextVal));
         queueKnobChange(knob.addr, nextVal);
       }
     });
@@ -1646,6 +1662,10 @@
       } catch (_) {}
       group.classList.remove("is-active");
       hideKnobTooltip();
+      if (app.activeDragAddr === knob.addr) {
+        app.activeDragAddr = null;
+      }
+      queueKnobChange(knob.addr, knob.raw, true);
     };
 
     group.addEventListener("pointerup", onPointerEnd);
@@ -1659,8 +1679,8 @@
       if (nextVal !== knob.raw) {
         knob.raw = nextVal;
         updateKnobAngle(pointerGroup, cx, cy, nextVal, maxVal);
-        showKnobTooltip(group, knob.name, formatKnobValue(knob, nextVal));
-        queueKnobChange(knob.addr, nextVal);
+        showKnobTooltip(group, knobLabel, getTooltipDisplay(nextVal));
+        queueKnobChange(knob.addr, nextVal, true);
         hideKnobTooltip();
       }
     }, { passive: false });
@@ -2449,6 +2469,9 @@
     renderPedalboard();
     renderAmpStage();
     renderInspector();
+    if (els["effects-drawer"] && !els["effects-drawer"].hidden) {
+      renderEffectsLibrary();
+    }
     if (!els["modal-backup"].hidden) {
       updateBackupRestoreButtons();
     }
@@ -2715,6 +2738,9 @@
         });
         if (els["effects-drawer"] && !els["effects-drawer"].hidden) {
           toggleEffectsDrawer(false);
+        }
+        if (els["presets-drawer"] && els["presets-drawer"].classList.contains("drawer-open")) {
+          togglePresetsDrawer(false);
         }
       } else if (ev.key === "p" || ev.key === "P") {
         ev.preventDefault();
