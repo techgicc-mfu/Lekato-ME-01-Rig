@@ -420,6 +420,112 @@ def decode_name_table(data280: bytes) -> list[str]:
     return names
 
 
+def encode_name_record(name: str) -> bytes:
+    """Encode a string into a 14-byte NUL-padded ASCII record (max 13 chars + NUL)."""
+    if not isinstance(name, str):
+        raise ProtocolError(f"name must be str, got {type(name).__name__}")
+    clean = name.strip().encode("ascii", errors="replace")[: NAME_RECORD_LEN - 1]
+    return clean.ljust(NAME_RECORD_LEN, b"\x00")
+
+
+def build_rename_slot(category: str, slot: int, name: str) -> bytes:
+    """Build a 0x22 command to rename an AMP (0x90000000) or CAB (0x80000000) slot in flash."""
+    cat = str(category).lower().strip()
+    if cat not in ("amp", "cab"):
+        raise ProtocolError(f"category must be 'amp' or 'cab', got {category!r}")
+    slot_idx = _require_range(slot, 0, NAME_RECORD_COUNT - 1, "slot")
+    base_addr = ADDR_AMP_NAMES if cat == "amp" else ADDR_CAB_NAMES
+    addr = base_addr + slot_idx * NAME_RECORD_LEN
+    data = encode_name_record(name)
+    body = (
+        bytes([SPACE_NAMES])
+        + addr.to_bytes(4, "little")
+        + len(data).to_bytes(3, "little")
+        + data
+    )
+    return build_frame(CMD_WRITE, body)
+
+
+def parse_capture_header(data: bytes) -> dict[str, Any]:
+    """Parse and validate an AM4, AM3, AM2, or CAB capture file header."""
+    if not isinstance(data, (bytes, bytearray, memoryview)):
+        raise ProtocolError("Capture data must be bytes-like")
+    raw = bytes(data)
+    if len(raw) < 18:
+        raise ProtocolError(f"Capture payload too short: {len(raw)} bytes (min 18)")
+    magic = raw[:4]
+    if magic not in (b"AM4\x00", b"AM3\x00", b"AM2\x00", b"CAB\x00"):
+        raise ProtocolError(f"Invalid capture magic: {magic!r}")
+    magic_str = magic[:3].decode("ascii")
+    name = raw[4:18].split(b"\x00", 1)[0].decode("ascii", errors="replace").strip()
+    kind = "cab" if magic == b"CAB\x00" else "amp"
+    return {
+        "valid": True,
+        "magic": magic_str,
+        "kind": kind,
+        "name": name,
+        "size": len(raw),
+    }
+
+
+def parse_wav_header(data: bytes) -> dict[str, Any]:
+    """Parse and validate a standard RIFF/WAVE impulse response (IR) header."""
+    if not isinstance(data, (bytes, bytearray, memoryview)):
+        raise ProtocolError("WAV data must be bytes-like")
+    raw = bytes(data)
+    if len(raw) < 44:
+        raise ProtocolError(f"WAV payload too short: {len(raw)} bytes (min 44)")
+    if raw[:4] != b"RIFF" or raw[8:12] != b"WAVE":
+        raise ProtocolError("Invalid RIFF/WAVE header")
+
+    import struct
+
+    idx = 12
+    fmt_found = False
+    data_found = False
+    channels = 1
+    sample_rate = 48000
+    bits_per_sample = 24
+    num_samples = 0
+
+    while idx + 8 <= len(raw):
+        chunk_id = raw[idx : idx + 4]
+        chunk_size = struct.unpack_from("<I", raw, idx + 4)[0]
+        idx += 8
+        if chunk_id == b"fmt ":
+            if chunk_size < 16:
+                raise ProtocolError(f"Malformed fmt chunk size: {chunk_size}")
+            fmt_found = True
+            audio_format, channels, sample_rate, byte_rate, block_align, bits_per_sample = (
+                struct.unpack_from("<HHIIHH", raw, idx)
+            )
+            if audio_format not in (1, 3):
+                raise ProtocolError(f"Unsupported WAV audio format: {audio_format}")
+        elif chunk_id == b"data":
+            data_found = True
+            bytes_per_sample = bits_per_sample // 8 if bits_per_sample else 2
+            channel_count = channels if channels else 1
+            num_samples = (
+                chunk_size // (bytes_per_sample * channel_count)
+                if (bytes_per_sample * channel_count)
+                else 0
+            )
+            break
+        idx += chunk_size
+
+    if not fmt_found or not data_found:
+        raise ProtocolError("WAV file missing required fmt or data chunks")
+
+    return {
+        "valid": True,
+        "channels": channels,
+        "sample_rate": sample_rate,
+        "bits_per_sample": bits_per_sample,
+        "samples": num_samples,
+        "size": len(raw),
+    }
+
+
 def format_knob_display(block_id: int, model_id: int, slot: int, raw_value: int) -> str:
     """Format a raw 0..100 knob value into human-readable physical units."""
     blk = _require_range(block_id, 0, 5, "block_id")

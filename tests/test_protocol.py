@@ -27,6 +27,10 @@ from me01_rig.protocol import (
     parse_frame,
     unwrap_sysex,
     wrap_sysex,
+    encode_name_record,
+    build_rename_slot,
+    parse_capture_header,
+    parse_wav_header,
 )
 
 FIXTURE_PATH = Path(__file__).parent / "fixtures" / "me01_captured_vectors.json"
@@ -360,6 +364,99 @@ class ProtocolTests(unittest.TestCase):
         self.assertEqual(BLOCKS[4].models[3].slots[4], "Combs")
         self.assertEqual(BLOCKS[4].models[4].slots[4], "Amount")
         self.assertEqual(BLOCKS[4].models[5].slots[4], "Diffusion")
+
+    def test_encode_name_record_and_build_rename_slot(self) -> None:
+        # Standard record encoding
+        rec = encode_name_record("Clean TS9")
+        self.assertEqual(len(rec), 14)
+        self.assertEqual(rec, b"Clean TS9\x00\x00\x00\x00\x00")
+
+        # Truncation: 13 chars max so 14th is always NUL terminator
+        long_rec = encode_name_record("SuperLongCaptureName")
+        self.assertEqual(len(long_rec), 14)
+        self.assertEqual(long_rec, b"SuperLongCapt\x00")
+
+        # Non-ascii handling
+        unicode_rec = encode_name_record("MötleyCrüe")
+        self.assertEqual(len(unicode_rec), 14)
+        self.assertTrue(unicode_rec.endswith(b"\x00"))
+
+        # Build rename AMP slot
+        frame_amp = build_rename_slot("amp", 0, "TS9 Clean")
+        parsed_amp = parse_frame(frame_amp)
+        self.assertEqual(parsed_amp.cmd, 0x22)
+        # body: space (1 byte: 0x05) + addr (4 bytes: 0x90000000) + size (3 bytes: 14) + data (14 bytes)
+        self.assertEqual(parsed_amp.body[0], 0x05)
+        self.assertEqual(int.from_bytes(parsed_amp.body[1:5], "little"), 0x90000000)
+        self.assertEqual(int.from_bytes(parsed_amp.body[5:8], "little"), 14)
+        self.assertEqual(parsed_amp.body[8:], b"TS9 Clean\x00\x00\x00\x00\x00")
+
+        # Build rename CAB slot 19
+        frame_cab = build_rename_slot("cab", 19, "V30 Mesa 4x12")
+        parsed_cab = parse_frame(frame_cab)
+        self.assertEqual(parsed_cab.cmd, 0x22)
+        self.assertEqual(parsed_cab.body[0], 0x05)
+        self.assertEqual(int.from_bytes(parsed_cab.body[1:5], "little"), 0x80000000 + 19 * 14)
+        self.assertEqual(int.from_bytes(parsed_cab.body[5:8], "little"), 14)
+        self.assertEqual(parsed_cab.body[8:], b"V30 Mesa 4x12\x00")
+
+        # Boundary and invalid arguments
+        with self.assertRaises(ProtocolError):
+            build_rename_slot("mod", 0, "InvalidCategory")
+        with self.assertRaises(ProtocolError):
+            build_rename_slot("amp", -1, "InvalidSlot")
+        with self.assertRaises(ProtocolError):
+            build_rename_slot("cab", 20, "InvalidSlot")
+
+    def test_capture_and_wav_header_parsers(self) -> None:
+        import struct
+
+        # Valid AM4 capture
+        raw_am4 = b"AM4\x003VAVE_TS\x00\x00\x00\x00\x00" + b"\x00" * 200
+        meta_am4 = parse_capture_header(raw_am4)
+        self.assertEqual(meta_am4["magic"], "AM4")
+        self.assertEqual(meta_am4["name"], "3VAVE_TS")
+        self.assertEqual(meta_am4["kind"], "amp")
+        self.assertTrue(meta_am4["valid"])
+
+        # Valid CAB model
+        raw_cab = b"CAB\x001AC-SeVin\x00\x00\x00\x00\x00" + b"\x00" * 200
+        meta_cab = parse_capture_header(raw_cab)
+        self.assertEqual(meta_cab["magic"], "CAB")
+        self.assertEqual(meta_cab["name"], "1AC-SeVin")
+        self.assertEqual(meta_cab["kind"], "cab")
+        self.assertTrue(meta_cab["valid"])
+
+        # Rejects corrupt capture
+        with self.assertRaises(ProtocolError):
+            parse_capture_header(b"XYZ\x00TooShort")
+
+        # Synthetic 48kHz 24-bit mono WAV IR
+        sample_rate = 48000
+        channels = 1
+        bits = 24
+        num_samples = 1024
+        byte_rate = sample_rate * channels * (bits // 8)
+        block_align = channels * (bits // 8)
+        data_size = num_samples * block_align
+        chunk_size = 36 + data_size
+        wav_bytes = struct.pack(
+            "<4sI4s4sIHHIIHH4sI",
+            b"RIFF", chunk_size, b"WAVE",
+            b"fmt ", 16, 1, channels, sample_rate, byte_rate, block_align, bits,
+            b"data", data_size,
+        ) + b"\x00" * data_size
+
+        meta_wav = parse_wav_header(wav_bytes)
+        self.assertEqual(meta_wav["sample_rate"], 48000)
+        self.assertEqual(meta_wav["channels"], 1)
+        self.assertEqual(meta_wav["bits_per_sample"], 24)
+        self.assertEqual(meta_wav["samples"], 1024)
+        self.assertTrue(meta_wav["valid"])
+
+        # Rejects non-WAV
+        with self.assertRaises(ProtocolError):
+            parse_wav_header(b"NOT_A_WAV_FILE")
 
 
 if __name__ == "__main__":
