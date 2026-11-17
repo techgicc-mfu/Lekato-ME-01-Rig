@@ -1,5 +1,6 @@
 """ME-01 Rig package for LEKATO ME-01 USB-MIDI desktop editor."""
 
+from .device_service import DeviceService
 from .protocol import (
     ACK_FRAME,
     BLOCK_IDS,
@@ -62,6 +63,7 @@ __all__ = [
     "SPACE_PRESET",
     "TOTAL_PRESET_SLOTS",
     "BlockSpec",
+    "DeviceService",
     "FactorySlotLockedError",
     "MidiPortPair",
     "MidiTransportError",
