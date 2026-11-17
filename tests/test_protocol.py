@@ -300,6 +300,12 @@ class ProtocolTests(unittest.TestCase):
             build_save_flash(-1, raw92)
         with self.assertRaises(ProtocolError):
             build_save_flash(40, raw92[:91])
+        for bad_allow in ("false", 1, 0, ["no"], None):
+            with self.subTest(bad_allow=bad_allow):
+                with self.assertRaises(ProtocolError):
+                    build_save_flash(0, raw92, allow_factory=bad_allow)  # type: ignore[arg-type]
+                with self.assertRaises(ProtocolError):
+                    build_save_flash(40, raw92, allow_factory=bad_allow)  # type: ignore[arg-type]
 
         # ACK frame validation
         self.assertTrue(is_ack_frame(bytes.fromhex("00590001000000ff")))

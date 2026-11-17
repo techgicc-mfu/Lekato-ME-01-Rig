@@ -383,6 +383,8 @@ def build_change_routing(order: Sequence[int]) -> bytes:
 
 def build_save_flash(preset_id: int, raw92: bytes, *, allow_factory: bool = False) -> bytes:
     """Build a 0x22 flash slot write, enforcing the factory slot soft-lock."""
+    if not isinstance(allow_factory, bool):
+        raise ProtocolError("allow_factory must be a boolean")
     slot = _require_range(preset_id, 0, TOTAL_PRESET_SLOTS - 1, "preset_id")
     if slot < FACTORY_SLOT_COUNT and not allow_factory:
         raise FactorySlotLockedError(
