@@ -458,6 +458,39 @@ class UIAssetsTests(unittest.TestCase):
         self.assertIn('group.setAttribute("data-cy"', js_text)
         self.assertIn(".rotary-pointer-group", js_text)
 
+    def test_capture_manager_markup_and_css(self) -> None:
+        html_text = INDEX_HTML.read_text(encoding="utf-8")
+        css_text = STYLES_CSS.read_text(encoding="utf-8")
+
+        # 1. HTML triggers
+        self.assertIn('id="btn-open-capture-mgr"', html_text)
+        self.assertIn('id="btn-drawer-open-capture-mgr"', html_text)
+
+        # 2. HTML modal structure
+        self.assertIn('id="modal-capture-manager"', html_text)
+        self.assertIn('data-close-modal="modal-capture-manager"', html_text)
+        self.assertIn('id="tab-cap-amps"', html_text)
+        self.assertIn('id="tab-cap-cabs"', html_text)
+        self.assertIn('id="capture-slot-search"', html_text)
+        self.assertIn('id="capture-slots-grid"', html_text)
+        self.assertIn('id="capture-library-panel"', html_text)
+        self.assertIn('id="capture-file-dropzone"', html_text)
+        self.assertIn('id="capture-file-input"', html_text)
+
+        # 3. CSS skeuomorphic classes
+        for cls in (
+            "capture-manager-modal",
+            "capture-slots-grid",
+            "capture-slot-card",
+            "capture-slot-badge",
+            "capture-slot-led",
+            "capture-audition-btn",
+            "capture-rename-btn",
+            "capture-library-panel",
+            "capture-dropzone",
+        ):
+            self.assertIn(cls, css_text, f"Missing Capture Manager CSS class: {cls}")
+
 
 if __name__ == "__main__":
     unittest.main()

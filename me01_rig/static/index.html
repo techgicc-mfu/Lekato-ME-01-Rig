@@ -52,6 +52,7 @@
           </button>
           <button id="btn-revert" type="button" class="btn btn-ghost btn-sm" disabled>Revert</button>
           <button id="btn-backup" type="button" class="btn btn-secondary btn-sm" disabled>Backup</button>
+          <button id="btn-open-capture-mgr" type="button" class="btn btn-secondary btn-sm" title="Gestor de Capturas &amp; IRs (C)">Capturas &amp; IRs (C)</button>
           <button id="btn-toggle-effects" type="button" class="btn btn-secondary btn-sm" title="Toggle Effects Library (E)">Effects (E)</button>
           <button id="btn-save-slot" type="button" class="btn btn-primary btn-sm" disabled>Save to Slot</button>
         </div>
@@ -275,6 +276,10 @@
           <button id="btn-close-effects" type="button" class="btn-icon" aria-label="Close Effects Library">&times;</button>
         </div>
 
+        <div class="drawer-actions-bar">
+          <button id="btn-drawer-open-capture-mgr" type="button" class="btn btn-primary btn-sm btn-block">Gestionar 20 Slots AMP / IR</button>
+        </div>
+
         <div class="drawer-search-wrap">
           <input id="effects-search" class="text-input" type="search" placeholder="Search effects &amp; models...">
         </div>
@@ -489,6 +494,85 @@
       <div class="modal-footer">
         <button id="btn-close-backup" type="button" class="btn btn-ghost" data-close-modal="modal-backup">Close</button>
         <button id="btn-batch-restore" type="button" class="btn btn-primary" disabled>Batch Flash Restore</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Capture & IR Manager Modal -->
+  <div id="modal-capture-manager" class="modal-backdrop capture-manager-modal" role="dialog" aria-modal="true" aria-labelledby="modal-capture-manager-title" hidden>
+    <div class="modal-card modal-card-xl">
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <h3 id="modal-capture-manager-title" class="modal-title">Gestor de Capturas &amp; IRs</h3>
+          <p class="panel-subtitle">Gestiona y renombra los 20 slots de Preamp/Overdrive y 20 slots de Cabinets/IR en hardware</p>
+        </div>
+        <button type="button" class="btn-icon modal-close" data-close-modal="modal-capture-manager" aria-label="Close">&times;</button>
+      </div>
+
+      <div class="modal-body capture-modal-body">
+        <!-- Category switcher tabs & Search bar -->
+        <div class="capture-toolbar">
+          <div class="capture-category-tabs" role="tablist" aria-label="Categorías de Capturas">
+            <button id="tab-cap-amps" type="button" class="capture-tab is-active" data-category="amp" role="tab" aria-selected="true">
+              <span class="tab-label">Preamps &amp; Overdrives</span>
+              <span class="tab-count">20 slots</span>
+            </button>
+            <button id="tab-cap-cabs" type="button" class="capture-tab" data-category="cab" role="tab" aria-selected="false">
+              <span class="tab-label">Cabinets &amp; IRs</span>
+              <span class="tab-count">20 slots</span>
+            </button>
+          </div>
+
+          <div class="capture-filter-search-wrap">
+            <input id="capture-slot-search" class="text-input text-input-sm" type="search" placeholder="Buscar slots...">
+          </div>
+        </div>
+
+        <div class="capture-filter-chips" role="group" aria-label="Filtros por tipo">
+          <button type="button" class="chip is-active" data-filter="all">Todos</button>
+          <button type="button" class="chip" data-filter="Overdrive">Overdrive</button>
+          <button type="button" class="chip" data-filter="Clean">Clean</button>
+          <button type="button" class="chip" data-filter="Crunch">Crunch</button>
+          <button type="button" class="chip" data-filter="High Gain">High Gain</button>
+          <button type="button" class="chip" data-filter="Bass">Bass</button>
+        </div>
+
+        <!-- Main split content: Slots Grid on Left, Curated Library / Import Dropzone on Right -->
+        <div class="capture-content-split">
+          <div class="capture-grid-container">
+            <div id="capture-slots-grid" class="capture-slots-grid"></div>
+          </div>
+
+          <aside id="capture-library-panel" class="capture-library-panel">
+            <div class="capture-library-header">
+              <div>
+                <h4 class="capture-library-title">Biblioteca Curada</h4>
+                <p class="panel-subtitle">Modelos nativos optimizados para ME-01</p>
+              </div>
+              <span id="capture-lib-count" class="count-pill">0</span>
+            </div>
+
+            <div id="capture-library-list" class="capture-library-list"></div>
+
+            <div class="capture-import-section">
+              <h4 class="capture-library-title">Importar Archivo (.am4 / .wav)</h4>
+              <p class="panel-subtitle">Arrastra un archivo de captura AM4 o IR WAV de 44.1 kHz</p>
+              <div id="capture-file-dropzone" class="capture-dropzone">
+                <span class="dropzone-icon">📥</span>
+                <span class="dropzone-text">Arrastra aquí tu .am4 o .wav</span>
+                <label class="btn btn-secondary btn-sm" for="capture-file-input">
+                  Examinar archivo
+                  <input id="capture-file-input" type="file" accept=".am4,.wav,audio/wav" hidden>
+                </label>
+              </div>
+              <div id="capture-import-status" class="capture-import-status" hidden></div>
+            </div>
+          </aside>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn btn-ghost" data-close-modal="modal-capture-manager">Cerrar</button>
       </div>
     </div>
   </div>
